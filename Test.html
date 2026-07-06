@@ -82,4 +82,34 @@
                         <span class="badge">${config.route}</span>
                         <span class="dest-title">${config.platform} 月台 往機場方向</span>
                     </div>
-                    
+                    <ul class="eta-list">`;
+                
+                if(etaList.length === 0) {
+                    html += `<li class="eta-item" style="color:#64748b;justify-content:center;">暫無班次 (或此路線暫未進入青馬範圍)</li>`;
+                } else {
+                    etaList.slice(0, 2).forEach((item, index) => {
+                        let diffMins = Math.max(0, Math.floor((new Date(item.eta) - now) / 1000 / 60));
+                        let countdownStr = diffMins === 0 ? "即將到站" : `${diffMins} MINS`;
+                        html += `<li class="eta-item">
+                            <span class="sub-text">⏱️ 預計到站: ${item.eta.substring(11,16)}</span>
+                            <span class="countdown ${index===0?'next-one':''}">${countdownStr}</span>
+                        </li>`;
+                    });
+                }
+                html += `</ul></div>`;
+
+            } catch (e) {
+                console.error(e);
+                html += `<div class="data-box"><div class="loading" style="color:#ef4444;">${config.route} 軌跡追蹤失敗</div></div>`;
+            }
+        }
+
+        contentDiv.innerHTML = html;
+    }
+
+    // 啟動與每 30 秒自動重整
+    refreshBusData();
+    setInterval(refreshBusData, 30000);
+</script>
+</body>
+</html>
