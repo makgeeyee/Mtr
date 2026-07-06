@@ -42,4 +42,33 @@
                     let foundAny = false;
                     html += `<ul>`;
                     
-                    // 逐個
+                    // 逐個站比對名字
+                    for (let stopInfo of json.data) {
+                        let stopRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop/${stopInfo.stop}`);
+                        let stopJson = await stopRes.json();
+                        let stopName = stopJson.data.name_tc;
+
+                        if (stopName.includes("青嶼幹線")) {
+                            html += `<li class="match">✅ 搵到啦！[站序 ${stopInfo.seq}] ${stopName} ➡️ Stop ID: ${stopInfo.stop}</li>`;
+                            foundAny = true;
+                        }
+                    }
+                    html += `</ul>`;
+                    
+                    if (!foundAny) {
+                        html += `<p style="color:#94a3b8;">⚠️ 呢個方向有路線圖，但沿途無經過「青嶼幹線」站。</p>`;
+                    }
+
+                } catch (e) {
+                    html += `<p class="error">❌ 連線出錯: ${e.message}</p>`;
+                }
+            }
+            html += `</div>`;
+            logDiv.innerHTML += html;
+        }
+    }
+
+    probe();
+</script>
+</body>
+</html>
