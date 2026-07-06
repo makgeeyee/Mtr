@@ -113,30 +113,28 @@
     <h1>✈️ 機場 / 國泰城實時顯示屏</h1>
     <div class="update-time" id="update-time">最後更新: 正在初始化...</div>
     <div id="content">
-        <div class="loading">正在分流載入 TW602 及 TW603 數據，請稍候...</div>
+        <div class="loading">正在切換至 Outbound 方向數據，請稍候...</div>
     </div>
 </div>
 
 <script>
-    // 依據你的 KMB App 肉眼情報，進行 100% 精確手動鎖定
     let config = [
         // 🏠 烏溪沙出發總站 (固定)
         { route: "A41P", dir: "O", type: "manual", title: "往 機場 (地面運輸中心)", stopName: "烏溪沙站", stopId: "BA72214DFE48AA86" },
         
-        // ✈️ 機場回程總站 (保持自動探測，之前已驗證成功)
+        // ✈️ 機場回程總站 (自動探測)
         { route: "A41P", dir: "I", type: "auto", seq: 1, title: "往 烏溪沙站", stopName: "機場 (地面運輸中心)", stopId: null },
         { route: "E42",  dir: "I", type: "auto", seq: 1, title: "往 沙田 (博康)", stopName: "機場 (地面運輸中心)", stopId: null },
         
-        // 🚌 青馬轉車站 ➡️ [TW602 月台] 專區
-        { route: "E42",  dir: "I", type: "manual", title: "青馬轉車站 (TW602) ➡️ 往國泰城", stopName: "青嶼幹線轉車站", stopId: "A3052E7BE53415D6" },
-        { route: "E36S", dir: "I", type: "manual", title: "青馬轉車站 (TW602) ➡️ 往國泰城", stopName: "青嶼幹線轉車站", stopId: "A3052E7BE53415D6" },
+        // 🚌 青馬轉車站 ➡️ [TW602 月台] 專區 (🔥 終極修正：全部切換為 "O")
+        { route: "E42",  dir: "O", type: "manual", title: "青馬轉車站 (TW602) ➡️ 往國泰城", stopName: "青嶼幹線轉車站", stopId: "A3052E7BE53415D6" },
+        { route: "E36S", dir: "O", type: "manual", title: "青馬轉車站 (TW602) ➡️ 往國泰城", stopName: "青嶼幹線轉車站", stopId: "A3052E7BE53415D6" },
         
-        // 🚌 青馬轉車站 ➡️ [TW603 月台] 專區
-        { route: "E32",  dir: "I", type: "manual", title: "青馬轉車站 (TW603) ➡️ 往國泰城", stopName: "青嶼幹線轉車站", stopId: "D1658DB3850D95A4" },
-        { route: "E41",  dir: "I", type: "manual", title: "青馬轉車站 (TW603) ➡️ 往國泰城", stopName: "青嶼幹線轉車站", stopId: "D1658DB3850D95A4" }
+        // 🚌 青馬轉車站 ➡️ [TW603 月台] 專區 (🔥 終極修正：全部切換為 "O")
+        { route: "E32",  dir: "O", type: "manual", title: "青馬轉車站 (TW603) ➡️ 往國泰城", stopName: "青嶼幹線轉車站", stopId: "D1658DB3850D95A4" },
+        { route: "E41",  dir: "O", type: "manual", title: "青馬轉車站 (TW603) ➡️ 往國泰城", stopName: "青嶼幹線轉車站", stopId: "D1658DB3850D95A4" }
     ];
 
-    // 只有機場回程總站需要自動撈取第一站
     async function autoDiscoverStopIds() {
         for (let bus of config) {
             if (bus.type === "auto" && !bus.stopId) {
@@ -174,13 +172,10 @@
                 const response = await fetch(url);
                 const json = await response.json();
                 
-                // 篩選出同時符合路線名和官方方向代號的即時數據
                 let rawList = json.data.filter(item => item.route === bus.route && item.dir === bus.dir && item.eta);
 
-                // 按時間先後排序
                 rawList.sort((a, b) => new Date(a.eta) - new Date(b.eta));
 
-                // 強力去重（防影分身）
                 let etaList = [];
                 rawList.forEach(item => {
                     const etaTime = new Date(item.eta);
@@ -247,7 +242,7 @@
     async function startApp() {
         await autoDiscoverStopIds();
         await fetchAllETA();
-        setInterval(fetchAllETA, 30000); // 每 30 秒全自動背後重整
+        setInterval(fetchAllETA, 30000);
     }
 
     startApp();
