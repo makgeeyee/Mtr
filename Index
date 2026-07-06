@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>烏溪沙站即時到站時間</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            padding: 30px;
+            width: 100%;
+            max-width: 500px;
+            border-top: 8px solid #9a3820; /* 屯馬綫啡色 */
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+            font-size: 24px;
+            text-align: center;
+        }
+        .station-name {
+            color: #9a3820;
+            font-weight: bold;
+        }
+        .update-time {
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .train-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .train-item {
+            background-color: #f8f9fa;
+            border-left: 5px solid #28a745;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .platform {
+            font-size: 14px;
+            color: #555;
+            background: #e9ecef;
+            padding: 2px 8px;
+            border-radius: 12px;
+        }
+        .time-countdown {
+            font-size: 18px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .loading, .error {
+            text-align: center;
+            color: #666;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1><span class="station-name">烏溪沙站</span> 即時班次</h1>
+    <div class="update-time" id="update-time">最後更新: 載入中...</div>
+    
+    <div id="content">
+        <div class="loading">正在獲取港鐵數據...</div>
+    </div>
+</div>
+
+<script>
+    // 港鐵開放數據 API 網址
+    // TML = 屯馬綫, WKS = 烏溪沙
+    const apiURL = "https://rt.data.gov.hk/v1/transport/mtr/getSchedule.php?line=TML&sta=WKS";
+
+    async function fetchMTRData() {
+        try {
+            const response = await fetch(apiURL);
+            if (!response.ok) throw new Error('網絡連線有問題');
+            
+            const data = await response.json();
+            
+            // 檢查是否有數據返還
+            if (data.status === 1 && data.data[`TML-WKS`]) {
+                updateUI(data.data[`TML-WKS`]);
+            } else {
+                showError("暫時未有列車班次資料（可能已收車）");
+            }
+        } catch (error) {
+            console.error(error);
+            showError("未能獲取數據，請稍後再試。");
+        }
+    }
+
+    function updateUI(stationData) {
+        const contentDiv = document.getElementById('content');
+        const updateTimeDiv = document.getElementById('update-time');
+        
+        // 更新系統時間
+        updateTimeDiv.innerText = `最後更新: ${stationData.curr_time}`;
+
+        // 烏溪沙係終點站，所以通常只有「下行」車去屯門 (UP = 往烏溪沙/上行, DOWN = 往屯門/下行)
+        // 喺烏溪沙站開出嘅車屬於 DOWN
+        const trains = stationData.DOWN || [];
+
+        if (trains.length === 0) {
+            contentDiv.innerHTML = `<div class="error">目前沒有即時開出班次。</div>`;
+            return;
+        }
+
+        let htmlContent = '<ul class="train-list">';
+        
+        trains.forEach(train => {
+            // 計算仲有幾多分鐘開車
+            const minutesLeft = train.ttnt; 
+            let timeDisplay = minutesLeft === "0" ? "即將開出" : `${minutesLeft} 分鐘`;
+            
+            // 格式化預計開出時間 (HH:MM:SS)
+            const timeStr = train.time.split(' ')[1];
+
+            htmlContent += `
+                <li class="train-item">
+                    <div>
+                        <strong>往 ${train.dest === 'TUM' ? '屯門' : train.dest}</strong>
+                        <div style="font-size: 12px; color: #777; margin-top: 5px;">預計開出: ${timeStr}</div>
+                    </div>
+                    <div>
+                        <span class="platform">${train.plat} 號月台</span>
+                        <div class="time-countdown">${timeDisplay}</div>
+                    </div>
+                </li>
+            `;
+        });
+
+        htmlContent += '</ul>';
+        contentDiv.innerHTML = htmlContent;
+    }
+
+    function showError(message) {
+        document.getElementById('content').innerHTML = `<div class="error">${message}</div>`;
+        document.getElementById('update-time').innerText = `最後更新: --:--:--`;
+    }
+
+    // 首次執行
+    fetchMTRData();
+
+    // 每 30 秒自動更新一次
+    setInterval(fetchMTRData, 30000);
+</script>
+
+</body>
+</html>
