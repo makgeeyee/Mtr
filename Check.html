@@ -2,56 +2,61 @@
 <html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>石硤尾站實時到站</title>
     <style>
-        body { font-family: sans-serif; background-color: #0f172a; color: #f8fafc; padding: 20px; display: flex; justify-content: center; }
-        .container { width: 100%; max-width: 400px; }
-        .data-box { background: #1e293b; padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 6px solid #8cc63f; } /* 觀塘綫綠色 */
+        body { font-family: sans-serif; background-color: #0f172a; color: #f8fafc; padding: 20px; }
+        .data-box { background: #1e293b; padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 6px solid #8cc63f; }
         .title { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
         .eta-item { display: flex; justify-content: space-between; padding: 5px 0; font-size: 16px; }
-        .loading { text-align: center; color: #94a3b8; margin-top: 20px; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="title">🚇 石硤尾站 (觀塘綫)</div>
-    <div id="mtr-content"><div class="loading">正在擷取 MTR 數據...</div></div>
-</div>
+<div class="title">🚇 石硤尾站 (觀塘綫)</div>
+<div id="mtr-content">正在連線至港鐵伺服器...</div>
 
 <script>
     async function getMTR() {
+        const content = document.getElementById('mtr-content');
         try {
-            // 石硤尾站代碼: SKM, 觀塘綫: KTL
-            const response = await fetch('https://rt.data.gov.hk/v1/transport/mtr/getETA.php?line=KTL&station=SKM');
-            const json = await response.json();
-            const data = json.data["KTL-SKM"];
+            // 使用 corsproxy.io 作為中轉，強行繞過 CORS 限制
+            const proxyUrl = 'https://corsproxy.io/?';
+            const mtrUrl = 'https://rt.data.gov.hk/v1/transport/mtr/getETA.php?line=KTL&station=SKM';
             
+            const response = await fetch(proxyUrl + encodeURIComponent(mtrUrl));
+            const json = await response.json();
+            
+            if (!json.data || !json.data["KTL-SKM"]) {
+                content.innerHTML = "目前暫無班次數據";
+                return;
+            }
+
+            const data = json.data["KTL-SKM"];
             let html = '';
             
-            // 處理往黃埔方向 (UP)
+            // 往黃埔
             html += `<div class="data-box"><div>往黃埔方向</div>`;
             data.UP.forEach(t => {
                 html += `<div class="eta-item"><span>月台 ${t.plat}</span><span>${t.ttnt} 分鐘</span></div>`;
             });
             html += `</div>`;
 
-            // 處理往調景嶺方向 (DOWN)
+            // 往調景嶺
             html += `<div class="data-box"><div>往調景嶺方向</div>`;
             data.DOWN.forEach(t => {
                 html += `<div class="eta-item"><span>月台 ${t.plat}</span><span>${t.ttnt} 分鐘</span></div>`;
             });
             html += `</div>`;
             
-            document.getElementById('mtr-content').innerHTML = html;
+            content.innerHTML = html;
         } catch (e) {
-            document.getElementById('mtr-content').innerHTML = `<div class="loading">連線錯誤，請稍後重試</div>`;
+            content.innerHTML = "連線失敗，可能是 Proxy 服務中斷。";
+            console.error(e);
         }
     }
     
     getMTR();
-    setInterval(getMTR, 30000); // 30秒更新一次
+    setInterval(getMTR, 30000);
 </script>
 </body>
 </html>
