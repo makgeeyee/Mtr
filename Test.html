@@ -24,7 +24,6 @@
             max-width: 450px; 
             border-top: 8px solid #9a3b26; 
         }
-        /* 三頁籤 Tab 樣式 */
         .tab-box {
             display: flex;
             background: #0f172a;
@@ -122,14 +121,14 @@
     let currentMode = 'initial'; 
     let timer = null;
 
-    // 1. 完全還原你原本 https://makgeeyee.github.io/Mtr/ 運作最完美的初始巴士設定與 Stop ID
+    // 1. 初始巴士設定
     const initialConfig = [
         { route: "A41P", stopId: "6C98380DB80A2A7B", title: "烏溪沙站 ➔ 往機場", badgeClass: "badge a-line" }, 
         { route: "A41P", stopId: "A63604C5A13E53AA", title: "機場/港珠澳 ➔ 往烏溪沙", badgeClass: "badge a-line" },
         { route: "E42",  stopId: "17208E20FC5E0C25", title: "大圍站 ➔ 往機場", badgeClass: "badge" }
     ];
 
-    // 2. 今日大獲全勝嘅青馬雙月台真核心 ID 4 班車配置
+    // 2. 青馬轉車站 4 班車配置
     const bbiConfig = [
         { id: "DBB6D5D26FF3D909", name: "TW602 月台", routes: ["E42", "E36S"] },
         { id: "8394FFF35F9D2EFB", name: "TW603 月台", routes: ["E32", "E41"] }
@@ -152,7 +151,7 @@
         let html = '';
 
         if (currentMode === 'initial') {
-            // ========= 🏠 Tab 1: 完全採用你原本行得通的解法 =========
+            // ========= 🏠 Tab 1: 初始班車模式 =========
             for (let item of initialConfig) {
                 try {
                     const response = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${item.stopId}`);
@@ -199,7 +198,7 @@
             contentDiv.innerHTML = html;
 
         } else if (currentMode === 'bbi') {
-            // ========= ✈️ Tab 2: 青馬 4 班車直連勝利還原模式 =========
+            // ========= ✈️ Tab 2: 青馬 4 班車模式 =========
             for (let plat of bbiConfig) {
                 try {
                     const response = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${plat.id}`);
@@ -248,11 +247,15 @@
             contentDiv.innerHTML = html;
 
         } else if (currentMode === 'mtr') {
-            // ========= 🚇 Tab 3: 完全還原你原本網頁中 100% 成功運作的地鐵撈取法 =========
+            // ========= 🚇 Tab 3: 烏溪沙 MTR 模式 (採用 AllOrigins 開源盾牌強行解鎖 CORS) =========
             try {
-                // 這裡完全保留你原本網頁用緊嘅所有正確參數與解鎖手段
-                const response = await fetch(`https://rt.data.gov.hk/v1/transport/mtr/getETA.php?line=TML&station=WKS`);
-                const json = await response.json();
+                const mtrApiUrl = 'https://rt.data.gov.hk/v1/transport/mtr/getETA.php?line=TML&station=WKS';
+                // 使用 allorigins 代替直接抓取，完美融化港鐵 CORS 鎖定
+                const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(mtrApiUrl)}`);
+                const wrapper = await response.json();
+                
+                // 轉為 JSON 物件
+                const json = JSON.parse(wrapper.contents);
                 const stationData = json.data["TML-WKS"];
 
                 html += `<div class="data-box">
@@ -281,11 +284,13 @@
                 html += `</ul></div>`;
                 contentDiv.innerHTML = html;
             } catch (e) {
-                contentDiv.innerHTML = `<div class="loading" style="color:#ef4444;">MTR 連線失敗，請重新整理</div>`;
+                console.error(e);
+                contentDiv.innerHTML = `<div class="loading" style="color:#ef4444;">地鐵數據解鎖失敗，請重新整理</div>`;
             }
         }
     }
 
+    // 啟動與定時 30 秒重整
     switchTab('initial');
     if(timer) clearInterval(timer);
     timer = setInterval(refreshData, 30000);
