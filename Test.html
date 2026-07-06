@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>機場快綫巴士即時到站顯示屏</title>
+    <title>機場及國泰城巴士實時顯示屏</title>
     <style>
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -21,7 +21,7 @@
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); 
             padding: 20px; 
             width: 100%; 
-            max-width: 450px; 
+            max-width: 460px; 
             border-top: 8px solid #f97316; 
         }
         h1 { 
@@ -37,11 +37,19 @@
             text-align: center; 
             margin-bottom: 20px; 
         }
+        .section-title {
+            color: #facc15;
+            font-size: 14px;
+            font-weight: bold;
+            margin: 15px 0 8px 5px;
+            display: flex;
+            align-items: center;
+        }
         .bus-route-box { 
             background: #0f172a; 
             border: 1px solid #334155; 
-            padding: 15px; 
-            margin-bottom: 15px; 
+            padding: 12px 15px; 
+            margin-bottom: 12px; 
             border-radius: 12px; 
         }
         .bus-header { 
@@ -50,14 +58,14 @@
             align-items: center; 
             border-bottom: 1px solid #334155; 
             padding-bottom: 8px; 
-            margin-bottom: 10px; 
+            margin-bottom: 8px; 
         }
         .route-num { 
-            font-size: 26px; 
+            font-size: 24px; 
             font-weight: 900; 
             color: #f97316; 
             background: #292524;
-            padding: 2px 10px;
+            padding: 2px 8px;
             border-radius: 6px;
         }
         .route-dest { 
@@ -81,20 +89,20 @@
             display: flex; 
             justify-content: space-between; 
             align-items: center; 
-            padding: 10px 0; 
-            font-size: 15px; 
+            padding: 8px 0; 
+            font-size: 14px; 
             border-bottom: 1px dashed #1e293b;
         }
         .eta-item:last-child { border-bottom: none; }
         .eta-time { 
             color: #94a3b8; 
-            font-size: 14px; 
+            font-size: 13px; 
         }
         .eta-countdown { 
             font-weight: bold; 
             color: #38bdf8; 
             font-family: monospace;
-            font-size: 16px;
+            font-size: 15px;
         }
         .next-bus { 
             color: #facc15; 
@@ -110,44 +118,65 @@
 <body>
 
 <div class="container">
-    <h1>✈️ 機場巴士實時顯示屏</h1>
-    <div class="update-time" id="update-time">最後更新: 正在初始化 AI 全自動探測...</div>
+    <h1>✈️ 機場 / 國泰城實時顯示屏</h1>
+    <div class="update-time" id="update-time">最後更新: 正在初始化...</div>
     <div id="content">
-        <div class="loading">正在全自動破解及抓取九巴車站金鑰，請稍候...</div>
+        <div class="loading">正在更新國泰城通勤線路數據，請稍候...</div>
     </div>
 </div>
 
 <script>
-    // 核心骨架：定義目標路線，但 Stop ID 留空，由程式動態獲取
+    // 精準路線名冊
     let config = [
-        { route: "A41P", dir: "O", seq: 1, title: "往 機場 (地面運輸中心)", stopName: "烏溪沙站", stopId: "BA72214DFE48AA86" }, // 你幫手搵出嚟嘅真密碼
-        { route: "A41P", dir: "I", seq: 1, title: "往 烏溪沙站", stopName: "機場 (地面運輸中心)", stopId: null },
-        { route: "E42",  dir: "I", seq: 1, title: "往 沙田 (博康)", stopName: "機場 (地面運輸中心)", stopId: null }
+        // --- 類別 1: 馬鞍山出發站 ---
+        { type: "home", route: "A41P", dir: "O", seq: 1, title: "往 機場 (地面運輸中心)", stopName: "烏溪沙站總站", stopId: "BA72214DFE48AA86" },
+        
+        // --- 類別 2: 青嶼幹線轉車站 (依據你的真實搭乘清單修正) ---
+        { type: "transfer", route: "E42",  dir: "O", title: "往 機場 (經國泰城)", stopName: "青嶼幹線轉車站", stopId: null },
+        { type: "transfer", route: "E36S", dir: "O", title: "往 機場 (經國泰城)", stopName: "青嶼幹線轉車站", stopId: null },
+        { type: "transfer", route: "E32",  dir: "O", title: "往 航天城 (經國泰城)", stopName: "青嶼幹線轉車站", stopId: null },
+        { type: "transfer", route: "E41",  dir: "O", title: "往 航天城 (經國泰城)", stopName: "青嶼幹線轉車站", stopId: null },
+        
+        // --- 類別 3: 機場回程站 ---
+        { type: "airport", route: "A41P", dir: "I", seq: 1, title: "往 烏溪沙站", stopName: "機場 (地面運輸中心)", stopId: null },
+        { type: "airport", route: "E42",  dir: "I", seq: 1, title: "往 沙田 (博康)", stopName: "機場 (地面運輸中心)", stopId: null }
     ];
 
-    // 第一步：自動去九巴探測未知的車站 ID
-    async function autoDiscoverStopIds() {
+    // 全自動追蹤與密鑰獲取
+    async function autoDiscoverAllIds() {
+        let p馬Id = null;
+        try {
+            // 用 A41P 往機場方向去捕捉「青嶼幹線轉車站」的真 16 位密鑰
+            let res = await fetch("https://data.etabus.gov.hk/v1/transport/kmb/route-stop/A41P/outbound/1");
+            let json = await res.json();
+            for (let item of json.data) {
+                let stopRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop/${item.stop}`);
+                let stopJson = await stopRes.json();
+                if (stopJson.data.name_tc.includes("青嶼幹線")) {
+                    p馬Id = item.stop;
+                    break;
+                }
+            }
+        } catch (e) { console.error("動態抓取青馬站失敗", e); }
+
+        // 配置密鑰
         for (let bus of config) {
-            if (!bus.stopId) {
+            if (bus.type === "transfer" && p馬Id) {
+                bus.stopId = p馬Id;
+            }
+            if (!bus.stopId && bus.seq === 1) {
                 try {
                     let bound = bus.dir === "O" ? "outbound" : "inbound";
-                    let url = `https://data.etabus.gov.hk/v1/transport/kmb/route-stop/${bus.route}/${bound}/1`;
-                    let res = await fetch(url);
+                    let res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route-stop/${bus.route}/${bound}/1`);
                     let json = await res.json();
-                    
-                    // 根據站序 (seq: 1 代表起點總站) 搵出對應嘅隨機加密 Stop ID
                     let target = json.data.find(item => parseInt(item.seq) === bus.seq);
-                    if (target) {
-                        bus.stopId = target.stop;
-                    }
-                } catch (e) {
-                    console.error(`自動抓取 ${bus.route} 車站 ID 失敗:`, e);
-                }
+                    if (target) bus.stopId = target.stop;
+                } catch (e) { console.error(`抓取回程起點站失敗: ${bus.route}`, e); }
             }
         }
     }
 
-    // 第二步：獲取實時班次時間
+    // 實時更新渲染
     async function fetchAllETA() {
         const contentDiv = document.getElementById('content');
         let htmlContent = '';
@@ -155,81 +184,104 @@
         
         document.getElementById('update-time').innerText = `最後更新: ${now.toLocaleTimeString()}`;
 
-        for (const bus of config) {
-            // 如果仲未抓到 ID，就顯示載入中
-            if (!bus.stopId) {
-                htmlContent += `
-                    <div class="bus-route-box">
-                        <div class="bus-header"><span class="route-num">${bus.route}</span></div>
-                        <div class="loading" style="padding:10px;">密鑰解鎖中...</div>
-                    </div>`;
-                continue;
-            }
+        let groups = [
+            { id: "home", name: "🏠 馬鞍山出發 (A41P)" },
+            { id: "transfer", name: "🚌 青嶼幹線轉車站 ➡️ 轉車往國泰城" },
+            { id: "airport", name: "✈️ 機場地面運輸中心 回程" }
+        ];
 
-            try {
-                const url = `https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${bus.stopId}`;
-                const response = await fetch(url);
-                const json = await response.json();
-                
-                let etaList = json.data.filter(item => item.route === bus.route && item.dir === bus.dir && item.eta);
+        for (let group of groups) {
+            let groupBuses = config.filter(b => b.type === group.id);
+            htmlContent += `<div class="section-title">${group.name}</div>`;
 
-                etaList.sort((a, b) => new Date(a.eta) - new Date(b.eta));
-
-                htmlContent += `
-                    <div class="bus-route-box">
-                        <div class="bus-header">
-                            <span class="route-num">${bus.route}</span>
-                            <div class="route-dest">
-                                <div>${bus.title}</div>
-                                <span class="station-loc">📍 ${bus.stopName}</span>
-                            </div>
-                        </div>
-                        <ul class="eta-list">
-                `;
-
-                if (etaList.length === 0) {
-                    htmlContent += `<li class="eta-item" style="color:#64748b;justify-content:center;padding:10px 0;">暫時未有班次資料</li>`;
-                } else {
-                    // 顯示最多 3 班車
-                    etaList.slice(0, 3).forEach((item, index) => {
-                        const etaTime = new Date(item.eta);
-                        const diffMs = etaTime - now;
-                        const diffMins = Math.max(0, Math.floor(diffMs / 1000 / 60));
-                        
-                        let countdownStr = diffMins === 0 ? "即將開出" : `${diffMins} MINS`;
-                        let timeStr = item.eta.substring(11, 16);
-
-                        htmlContent += `
-                            <li class="eta-item">
-                                <span class="eta-time">⏱️ 預計開出: ${timeStr}</span>
-                                <span class="eta-countdown ${index === 0 ? 'next-bus' : ''}">${countdownStr}</span>
-                            </li>
-                        `;
-                    });
+            for (const bus of groupBuses) {
+                if (!bus.stopId) {
+                    htmlContent += `
+                        <div class="bus-route-box">
+                            <div class="bus-header"><span class="route-num">${bus.route}</span></div>
+                            <div class="loading" style="padding:10px; font-size:12px;">密鑰解鎖中...</div>
+                        </div>`;
+                    continue;
                 }
 
-                htmlContent += `</ul></div>`;
+                try {
+                    const url = `https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${bus.stopId}`;
+                    const response = await fetch(url);
+                    const json = await response.json();
+                    
+                    let rawList = json.data.filter(item => item.route === bus.route && item.dir === bus.dir && item.eta);
 
-            } catch (error) {
-                console.error(error);
-                htmlContent += `
-                    <div class="bus-route-box">
-                        <div class="bus-header"><span class="route-num">${bus.route}</span></div>
-                        <div style="color:#ef4444; font-size:13px; padding:10px 0;">訊號中斷</div>
-                    </div>`;
+                    rawList.sort((a, b) => new Date(a.eta) - new Date(b.eta));
+
+                    // 強力去重防影分身
+                    let etaList = [];
+                    rawList.forEach(item => {
+                        const etaTime = new Date(item.eta);
+                        const diffMins = Math.max(0, Math.floor((etaTime - now) / 1000 / 60));
+                        
+                        let isDuplicate = etaList.some(existingItem => {
+                            const existingEta = new Date(existingItem.eta);
+                            const existingMins = Math.max(0, Math.floor((existingEta - now) / 1000 / 60));
+                            return Math.abs(existingMins - diffMins) <= 1;
+                        });
+
+                        if (!isDuplicate) etaList.push(item);
+                    });
+
+                    htmlContent += `
+                        <div class="bus-route-box">
+                            <div class="bus-header">
+                                <span class="route-num">${bus.route}</span>
+                                <div class="route-dest">
+                                    <div>${bus.title}</div>
+                                    <span class="station-loc">📍 ${bus.stopName}</span>
+                                </div>
+                            </div>
+                            <ul class="eta-list">
+                    `;
+
+                    if (etaList.length === 0) {
+                        htmlContent += `<li class="eta-item" style="color:#64748b;justify-content:center;padding:5px 0;">暫時未有班次資料</li>`;
+                    } else {
+                        // 轉車站車多，顯示 2 班最精簡；家門口同機場顯示 3 班
+                        let displayCount = bus.type === "transfer" ? 2 : 3;
+                        etaList.slice(0, displayCount).forEach((item, index) => {
+                            const etaTime = new Date(item.eta);
+                            const diffMs = etaTime - now;
+                            const diffMins = Math.max(0, Math.floor(diffMs / 1000 / 60));
+                            
+                            let countdownStr = diffMins === 0 ? "即將開出" : `${diffMins} MINS`;
+                            let timeStr = item.eta.substring(11, 16);
+
+                            htmlContent += `
+                                <li class="eta-item">
+                                    <span class="eta-time">⏱️ 預計到站: ${timeStr}</span>
+                                    <span class="eta-countdown ${index === 0 ? 'next-bus' : ''}">${countdownStr}</span>
+                                </li>
+                            `;
+                        });
+                    }
+
+                    htmlContent += `</ul></div>`;
+
+                } catch (error) {
+                    console.error(error);
+                    htmlContent += `
+                        <div class="bus-route-box">
+                            <div class="bus-header"><span class="route-num">${bus.route}</span></div>
+                            <div style="color:#ef4444; font-size:12px; padding:5px 0;">訊號中斷</div>
+                        </div>`;
+                }
             }
         }
 
         contentDiv.innerHTML = htmlContent;
     }
 
-    // 終極啟動流程
     async function startApp() {
-        await autoDiscoverStopIds(); // 先全自動破解所有密碼
-        await fetchAllETA();         // 然後即時撈數據
-        
-        // 之後每 30 秒自動刷新數據
-        setInterval(fetchAllETA, 30000);
+        await autoDiscoverAllIds();
+        await fetchAllETA();
+        setInterval(fetchAllETA, 30000); // 30秒全自動重整
     }
 
     startApp();
