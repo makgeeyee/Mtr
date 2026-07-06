@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>青馬轉車站實時顯示屏 (Outbound 軌跡版)</title>
+    <title>青馬轉車站實時顯示屏 (龍運專用版)</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #0f172a; margin: 0; padding: 15px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .container { background: #1e293b; border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); padding: 20px; width: 100%; max-width: 450px; border-top: 8px solid #e11d48; }
+        .container { background: #1e293b; border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); padding: 20px; width: 100%; max-width: 450px; border-top: 8px solid #f97316; }
         h1 { color: #f8fafc; margin: 0 0 5px 0; font-size: 19px; text-align: center; letter-spacing: 1px; }
         .update-time { font-size: 12px; color: #94a3b8; text-align: center; margin-bottom: 20px; }
         .data-box { background: #0f172a; border: 1px solid #334155; padding: 15px; margin-bottom: 15px; border-radius: 12px; }
         .data-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 8px; margin-bottom: 10px; }
-        .badge { font-size: 13px; font-weight: bold; color: #fff; padding: 3px 10px; border-radius: 20px; background: #e11d48; }
+        .badge { font-size: 13px; font-weight: bold; color: #fff; padding: 3px 10px; border-radius: 20px; background: #f97316; }
         .dest-title { font-size: 14px; color: #f1f5f9; font-weight: bold; text-align: right; }
         .eta-list { list-style: none; padding: 0; margin: 0; }
         .eta-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; font-size: 15px; border-bottom: 1px dashed #1e293b; }
@@ -25,13 +25,13 @@
 <body>
 
 <div class="container">
-    <h1>✈️ 青馬轉車站實時顯示屏 (Outbound 軌跡版)</h1>
+    <h1>✈️ 青馬轉車站實時顯示屏 (龍運專用版)</h1>
     <div class="update-time" id="update-time">最後更新: 正在初始化...</div>
-    <div id="content"><div class="loading">正在追蹤 Outbound 機場路線軌跡...</div></div>
+    <div id="content"><div class="loading">正在連線龍運 Database 追蹤航班巴士...</div></div>
 </div>
 
 <script>
-    // 定義你想睇嘅路線同埋對應嘅月台標籤（全部走 outbound 往機場方向）
+    // 龍運機場線設定（Outbound 往機場方向）
     const targetConfig = [
         { route: "E42", platform: "TW602" },
         { route: "E36S", platform: "TW602" },
@@ -48,35 +48,31 @@
 
         for (let config of targetConfig) {
             try {
-                // 1. 先撈呢條線 outbound（往機場方向）嘅實時到站全數據
-                const response = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route-eta/${config.route}/outbound`);
+                // 🔥 修正關鍵：路徑由 kmb 改為 lwb (龍運專用數據庫)
+                const response = await fetch(`https://data.etabus.gov.hk/v1/transport/lwb/route-eta/${config.route}/outbound`);
                 const json = await response.json();
                 
                 let etaList = [];
                 
                 if (json && json.data) {
-                    // 2. 關鍵過濾：喺成條線幾十個站入面，只篩選出車站名稱包含「青嶼幹線」或「青馬」嘅到站時間
+                    // 篩選出有預計時間，且方向確實是往機場/東涌一帶的班次
                     let rawList = json.data.filter(item => 
                         item.eta && 
                         (item.dest_tc.includes("機場") || item.dest_tc.includes("博覽館") || item.dest_tc.includes("東涌") || item.dest_tc.includes("航天城"))
                     );
 
-                    // 由於一條線只會停一次青馬，我們根據 seq（站點順序）或者直接搵停靠青馬轉車站嘅那個數據
-                    // 為了百分之百準確，我們直接拿前台返回數據中，真正屬於青馬站點順序的預估時間
-                    // 根據九巴後台，同一條線同一班車喺同一個站只會出現一條 ETA 紀錄，我們按時間排先後
+                    // 按時間排序
                     rawList.sort((a, b) => new Date(a.eta) - new Date(b.eta));
 
-                    // 篩選去重（取前兩班車）
+                    // 去除重覆分鐘
                     rawList.forEach(item => {
                         let diff = Math.max(0, Math.floor((new Date(item.eta) - now) / 1000 / 60));
                         if (!etaList.some(ex => Math.abs(Math.max(0, Math.floor((new Date(ex.eta) - now)/1000/60)) - diff) <= 1)) {
-                            // 這裡只塞入預計到站時間
                             etaList.push(item);
                         }
                     });
                 }
 
-                // 3. 開始渲染這個路線的區塊
                 html += `<div class="data-box">
                     <div class="data-header">
                         <span class="badge">${config.route}</span>
@@ -85,7 +81,7 @@
                     <ul class="eta-list">`;
                 
                 if(etaList.length === 0) {
-                    html += `<li class="eta-item" style="color:#64748b;justify-content:center;">暫無班次 (或此路線暫未進入青馬範圍)</li>`;
+                    html += `<li class="eta-item" style="color:#64748b;justify-content:center;">暫無班次</li>`;
                 } else {
                     etaList.slice(0, 2).forEach((item, index) => {
                         let diffMins = Math.max(0, Math.floor((new Date(item.eta) - now) / 1000 / 60));
@@ -100,14 +96,13 @@
 
             } catch (e) {
                 console.error(e);
-                html += `<div class="data-box"><div class="loading" style="color:#ef4444;">${config.route} 軌跡追蹤失敗</div></div>`;
+                html += `<div class="data-box"><div class="loading" style="color:#ef4444;">${config.route} 龍運數據讀取失敗</div></div>`;
             }
         }
 
         contentDiv.innerHTML = html;
     }
 
-    // 啟動與每 30 秒自動重整
     refreshBusData();
     setInterval(refreshBusData, 30000);
 </script>
