@@ -113,55 +113,32 @@
     <h1>✈️ 機場巴士實時顯示屏</h1>
     <div class="update-time" id="update-time">最後更新: 正在初始化...</div>
     <div id="content">
-        <div class="loading">正在動態對接青馬轉車站數據，請稍候...</div>
+        <div class="loading">正在防禦影分身數據，請稍候...</div>
     </div>
 </div>
 
 <script>
-    // 終極骨架：不猜測轉車站方向，直接共享 A41P 搵到嘅青馬站 ID！
+    // 終極名冊：青馬轉車站直接寫入全港巴士數據庫的真實 Stop ID！
     let config = [
-        // 🏠 出發總站
-        { route: "A41P", dir: "O", type: "fixed", title: "往 機場 (地面運輸中心)", stopName: "烏溪沙站", stopId: "BA72214DFE48AA86" },
+        // 🏠 烏溪沙出發 (手動固定)
+        { route: "A41P", dir: "O", type: "manual", title: "往 機場 (地面運輸中心)", stopName: "烏溪沙站", stopId: "BA72214DFE48AA86" },
         
-        // ✈️ 機場回程總站
-        { route: "A41P", dir: "I", type: "discover_airport", seq: 1, title: "往 烏溪沙站", stopName: "機場 (地面運輸中心)", stopId: null },
-        { route: "E42",  dir: "I", type: "discover_airport", seq: 1, title: "往 沙田 (博康)", stopName: "機場 (地面運輸中心)", stopId: null },
+        // ✈️ 機場回程總站 (自動探測，之前已驗證成功)
+        { route: "A41P", dir: "I", type: "auto", seq: 1, title: "往 烏溪沙站", stopName: "機場 (地面運輸中心)", stopId: null },
+        { route: "E42",  dir: "I", type: "auto", seq: 1, title: "往 沙田 (博康)", stopName: "機場 (地面運輸中心)", stopId: null },
         
-        // 🚌 轉車站專區 (共享同一個實體青馬轉車站 ID，但留意：龍運後台定義呢 4 條線去機場其實係方向 "I")
-        { route: "E42",  dir: "I", type: "share_青馬", title: "青馬轉車站 ➡️ 往國泰城", stopName: "青嶼幹線轉車站", stopId: null },
-        { route: "E36S", dir: "I", type: "share_青馬", title: "青馬轉車站 ➡️ 往國泰城", stopName: "青嶼幹線轉車站", stopId: null },
-        { route: "E32",  dir: "I", type: "share_青馬", title: "青馬轉車站 ➡️ 往國泰城", stopName: "青嶼幹線轉車站", stopId: null },
-        { route: "E41",  dir: "I", type: "share_青馬", title: "青馬轉車站 ➡️ 往國泰城", stopName: "青嶼幹線轉車站", stopId: null }
+        // 🚌 青馬轉車站 ➡️ 往國泰城方向 (手動固定真密鑰，不再靠程式推測方向)
+        // 龍運系統中，呢四條線過左青馬都係行緊回程 (I) 
+        { route: "E42",  dir: "I", type: "manual", title: "青馬轉車站 ➡️ 往機場/國泰城", stopName: "青嶼幹線轉車站", stopId: "59929841C54D82BE" },
+        { route: "E36S", dir: "I", type: "manual", title: "青馬轉車站 ➡️ 往機場/國泰城", stopName: "青嶼幹線轉車站", stopId: "59929841C54D82BE" },
+        { route: "E32",  dir: "I", type: "manual", title: "青馬轉車站 ➡️ 往航天城/國泰城", stopName: "青嶼幹線轉車站", stopId: "59929841C54D82BE" },
+        { route: "E41",  dir: "I", type: "manual", title: "青馬轉車站 ➡️ 往航天城/國泰城", stopName: "青嶼幹線轉車站", stopId: "59929841C54D82BE" }
     ];
 
-    // 全自動追蹤邏輯：只查 A41P 去程路線，抓出青馬轉車站的真 ID
+    // 只有機場總站需要自動探測
     async function autoDiscoverStopIds() {
-        let shared青馬Id = null;
-
-        // 1. 用絕對行得通嘅 A41P 去程，暴力撈出沿途叫「青嶼幹線」嘅車站 ID
-        try {
-            let res = await fetch("https://data.etabus.gov.hk/v1/transport/kmb/route-stop/A41P/outbound");
-            let json = await res.json();
-            for (let item of json.data) {
-                let stopRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop/${item.stop}`);
-                let stopJson = await stopRes.json();
-                if (stopJson.data && stopJson.data.name_tc.includes("青嶼幹線")) {
-                    shared青馬Id = item.stop; // 抓到了！
-                    break;
-                }
-            }
-        } catch (e) {
-            console.error("抓取青馬轉車站共享 ID 失敗:", e);
-        }
-
-        // 2. 分配 ID
         for (let bus of config) {
-            // 如果係轉車線，直接塞入啱啱抓到嘅青馬轉車站 ID
-            if (bus.type === "share_青馬" && shared青馬Id) {
-                bus.stopId = shared青馬Id;
-            }
-            // 機場回程總站保持之前成功嘅自動探測
-            if (bus.type === "discover_airport" && !bus.stopId) {
+            if (bus.type === "auto" && !bus.stopId) {
                 try {
                     let res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route-stop/${bus.route}/inbound/1`);
                     let json = await res.json();
@@ -186,7 +163,7 @@
                 htmlContent += `
                     <div class="bus-route-box">
                         <div class="bus-header"><span class="route-num">${bus.route}</span></div>
-                        <div class="loading" style="padding:10px;">數據對接中...</div>
+                        <div class="loading" style="padding:10px;">密鑰解鎖中...</div>
                     </div>`;
                 continue;
             }
@@ -196,10 +173,10 @@
                 const response = await fetch(url);
                 const json = await response.json();
                 
-                // 篩選對應路線同方向
+                // 篩選出符合路線和方向的即時到站數據
                 let rawList = json.data.filter(item => item.route === bus.route && item.dir === bus.dir && item.eta);
 
-                // 按時間排序
+                // 排序
                 rawList.sort((a, b) => new Date(a.eta) - new Date(b.eta));
 
                 // 強力去重（防止影分身）
@@ -234,7 +211,6 @@
                 if (etaList.length === 0) {
                     htmlContent += `<li class="eta-item" style="color:#64748b;justify-content:center;padding:10px 0;">暫時未有班次資料</li>`;
                 } else {
-                    // 顯示最多 3 班車
                     etaList.slice(0, 3).forEach((item, index) => {
                         const etaTime = new Date(item.eta);
                         const diffMs = etaTime - now;
@@ -268,7 +244,7 @@
     }
 
     async function startApp() {
-        await autoDiscoverStopIds(); // 智慧共享全啟動
+        await autoDiscoverStopIds();
         await fetchAllETA();
         setInterval(fetchAllETA, 30000);
     }
