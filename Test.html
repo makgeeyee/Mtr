@@ -121,62 +121,49 @@
     <h1>✈️ 機場 / 國泰城實時顯示屏</h1>
     <div class="update-time" id="update-time">最後更新: 正在初始化...</div>
     <div id="content">
-        <div class="loading">正在更新國泰城通勤線路數據，請稍候...</div>
+        <div class="loading">正在校正龍運巴士方向參數，請稍候...</div>
     </div>
 </div>
 
 <script>
-    // 精準路線名冊
+    // 經人工拆解後的精準後台對照表
     let config = [
         // --- 類別 1: 馬鞍山出發站 ---
         { type: "home", route: "A41P", dir: "O", seq: 1, title: "往 機場 (地面運輸中心)", stopName: "烏溪沙站總站", stopId: "BA72214DFE48AA86" },
         
-        // --- 類別 2: 青嶼幹線轉車站 (依據你的真實搭乘清單修正) ---
-        { type: "transfer", route: "E42",  dir: "O", title: "往 機場 (經國泰城)", stopName: "青嶼幹線轉車站", stopId: null },
-        { type: "transfer", route: "E36S", dir: "O", title: "往 機場 (經國泰城)", stopName: "青嶼幹線轉車站", stopId: null },
-        { type: "transfer", route: "E32",  dir: "O", title: "往 航天城 (經國泰城)", stopName: "青嶼幹線轉車站", stopId: null },
-        { type: "transfer", route: "E41",  dir: "O", title: "往 航天城 (經國泰城)", stopName: "青嶼幹線轉車站", stopId: null },
+        // --- 類別 2: 青嶼幹線轉車站 (往機場方向) ---
+        // 修正：呢四條線去機場，喺 API 母體裡面其實全部叫 "I" (Inbound)！
+        { type: "transfer", route: "E42",  dir: "I", seq: 15, title: "往 機場 (經國泰城)", stopName: "青嶼幹線轉車站", stopId: null },
+        { type: "transfer", route: "E36S", dir: "I", seq: 15, title: "往 機場 (經國泰城)", stopName: "青嶼幹線轉車站", stopId: null },
+        { type: "transfer", route: "E32",  dir: "I", seq: 11, title: "往 航天城 (經國泰城)", stopName: "青嶼幹線轉車站", stopId: null },
+        { type: "transfer", route: "E41",  dir: "I", seq: 13, title: "往 航天城 (經國泰城)", stopName: "青嶼幹線轉車站", stopId: null },
         
         // --- 類別 3: 機場回程站 ---
         { type: "airport", route: "A41P", dir: "I", seq: 1, title: "往 烏溪沙站", stopName: "機場 (地面運輸中心)", stopId: null },
         { type: "airport", route: "E42",  dir: "I", seq: 1, title: "往 沙田 (博康)", stopName: "機場 (地面運輸中心)", stopId: null }
     ];
 
-    // 全自動追蹤與密鑰獲取
+    // 自動獲取精確 Stop ID
     async function autoDiscoverAllIds() {
-        let p馬Id = null;
-        try {
-            // 用 A41P 往機場方向去捕捉「青嶼幹線轉車站」的真 16 位密鑰
-            let res = await fetch("https://data.etabus.gov.hk/v1/transport/kmb/route-stop/A41P/outbound/1");
-            let json = await res.json();
-            for (let item of json.data) {
-                let stopRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop/${item.stop}`);
-                let stopJson = await stopRes.json();
-                if (stopJson.data.name_tc.includes("青嶼幹線")) {
-                    p馬Id = item.stop;
-                    break;
-                }
-            }
-        } catch (e) { console.error("動態抓取青馬站失敗", e); }
-
-        // 配置密鑰
         for (let bus of config) {
-            if (bus.type === "transfer" && p馬Id) {
-                bus.stopId = p馬Id;
-            }
-            if (!bus.stopId && bus.seq === 1) {
+            if (!bus.stopId) {
                 try {
                     let bound = bus.dir === "O" ? "outbound" : "inbound";
-                    let res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route-stop/${bus.route}/${bound}/1`);
+                    let url = `https://data.etabus.gov.hk/v1/transport/kmb/route-stop/${bus.route}/${bound}/${bus.seq}`;
+                    let res = await fetch(url);
                     let json = await res.json();
-                    let target = json.data.find(item => parseInt(item.seq) === bus.seq);
-                    if (target) bus.stopId = target.stop;
-                } catch (e) { console.error(`抓取回程起點站失敗: ${bus.route}`, e); }
+                    
+                    if (json.data && json.data.stop) {
+                        bus.stopId = json.data.stop; // 準確鎖定對應站序嘅 16 位密鑰
+                    }
+                } catch (e) { 
+                    console.error(`抓取 ${bus.route} 車站失敗:`, e); 
+                }
             }
         }
     }
 
-    // 實時更新渲染
+    // 獲取實時數據並渲染
     async function fetchAllETA() {
         const contentDiv = document.getElementById('content');
         let htmlContent = '';
@@ -199,7 +186,7 @@
                     htmlContent += `
                         <div class="bus-route-box">
                             <div class="bus-header"><span class="route-num">${bus.route}</span></div>
-                            <div class="loading" style="padding:10px; font-size:12px;">密鑰解鎖中...</div>
+                            <div class="loading" style="padding:10px; font-size:12px;">尋找正確方向站點...</div>
                         </div>`;
                     continue;
                 }
@@ -209,11 +196,12 @@
                     const response = await fetch(url);
                     const json = await response.json();
                     
+                    // 根據路線同 API 定義嘅真實方向篩選
                     let rawList = json.data.filter(item => item.route === bus.route && item.dir === bus.dir && item.eta);
 
                     rawList.sort((a, b) => new Date(a.eta) - new Date(b.eta));
 
-                    // 強力去重防影分身
+                    // 強力去重
                     let etaList = [];
                     rawList.forEach(item => {
                         const etaTime = new Date(item.eta);
@@ -243,7 +231,6 @@
                     if (etaList.length === 0) {
                         htmlContent += `<li class="eta-item" style="color:#64748b;justify-content:center;padding:5px 0;">暫時未有班次資料</li>`;
                     } else {
-                        // 轉車站車多，顯示 2 班最精簡；家門口同機場顯示 3 班
                         let displayCount = bus.type === "transfer" ? 2 : 3;
                         etaList.slice(0, displayCount).forEach((item, index) => {
                             const etaTime = new Date(item.eta);
@@ -279,9 +266,9 @@
     }
 
     async function startApp() {
-        await autoDiscoverAllIds();
+        await autoDiscoverAllIds(); // 執行精準站序追蹤
         await fetchAllETA();
-        setInterval(fetchAllETA, 30000); // 30秒全自動重整
+        setInterval(fetchAllETA, 30000);
     }
 
     startApp();
