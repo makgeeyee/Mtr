@@ -19,7 +19,7 @@
         .eta-time { color: #86868b; font-size: 13px; }
         .eta-countdown { font-weight: bold; color: #0071e3; }
         .next-bus { color: #ff9500; }
-        .loading, .error { text-align: center; color: #86868b; padding: 20px; }
+        .loading { text-align: center; color: #86868b; padding: 20px; }
     </style>
 </head>
 <body>
@@ -27,15 +27,15 @@
 <div class="container">
     <h1>機場巴士 到站時間</h1>
     <div class="update-time" id="update-time">最後更新: 載入中...</div>
-    <div id="content"><div class="loading">正在連線至九巴數據庫...</div></div>
+    <div id="content"><div class="loading">正在讀取九巴內部數據...</div></div>
 </div>
 
 <script>
-    // 【終極修正】更正為九巴官方真正的內部車站細寫代號
+    // 使用挖出來的九巴真實車站 ID
     const config = [
-        { route: "A41P", stopName: "烏溪沙站總站", stopId: "wu-kai-sha-station", title: "往 機場" },
-        { route: "A41P", stopName: "機場 (地面運輸中心)", stopId: "airport", title: "往 烏溪沙站" },
-        { route: "E42", stopName: "機場 (地面運輸中心)", stopId: "airport", title: "往 沙田 (博康)" }
+        { route: "A41P", stopName: "烏溪沙站總站", stopId: "WU04-T-1000-0", title: "往 機場", dir: "O" },
+        { route: "A41P", stopName: "機場 (地面運輸中心)", stopId: "AI09-T-1100-0", title: "往 烏溪沙站", dir: "I" },
+        { route: "E42", stopName: "機場 (地面運輸中心)", stopId: "AI09-T-1100-0", title: "往 沙田 (博康)", dir: "I" }
     ];
 
     async function fetchAllETA() {
@@ -47,21 +47,15 @@
 
         for (const bus of config) {
             try {
+                // 用內部 ID 讀取
                 const url = `https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${bus.stopId}`;
                 const response = await fetch(url);
                 const json = await response.json();
                 
-                // 篩選對應路線
-                let etaList = json.data.filter(item => item.route === bus.route && item.eta);
+                // 篩選出該路線與特定方向
+                let etaList = json.data.filter(item => item.route === bus.route && item.dir === bus.dir && item.eta);
 
-                // 針對有機場總站（airport）同烏溪沙總站嘅特別處理，自動分配方向
-                if (bus.stopId === "wu-kai-sha-station") {
-                    etaList = etaList.filter(item => item.dir === "O");
-                } else if (bus.stopId === "airport") {
-                    etaList = etaList.filter(item => item.dir === "I");
-                }
-
-                // 按到站時間排序
+                // 排序
                 etaList.sort((a, b) => new Date(a.eta) - new Date(b.eta));
 
                 htmlContent += `
@@ -79,7 +73,6 @@
                 if (etaList.length === 0) {
                     htmlContent += `<li class="eta-item" style="color:#86868b;">暫時未有班次資料</li>`;
                 } else {
-                    // 顯示頭兩班
                     etaList.slice(0, 2).forEach((item, index) => {
                         const etaTime = new Date(item.eta);
                         const diffMs = etaTime - now;
