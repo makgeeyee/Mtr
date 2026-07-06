@@ -2,67 +2,44 @@
 <html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
-    <title>青馬轉車站密碼探測器</title>
+    <title>青馬轉車站雙向探測器</title>
     <style>
-        body { font-family: monospace; background: #111; color: #fff; padding: 20px; }
-        .route-block { border: 1px solid #444; padding: 15px; margin-bottom: 20px; border-radius: 8px; }
-        h2 { color: #f97316; margin-top: 0; }
-        .match { color: #4ade80; font-weight: bold; background: #14532d; padding: 2px 5px; }
-        .loading { color: #888; }
+        body { font-family: monospace; background: #0f172a; color: #f1f5f9; padding: 20px; }
+        .route-block { border: 1px solid #334155; padding: 15px; margin-bottom: 20px; border-radius: 8px; background: #1e293b; }
+        h2 { color: #f97316; margin-top: 0; font-size: 18px; }
+        .direction-title { color: #38bdf8; font-weight: bold; margin-top: 10px; }
+        .match { color: #4ade80; font-weight: bold; background: #14532d; padding: 4px 8px; border-radius: 4px; display: inline-block; margin: 2px 0; }
+        .error { color: #f87171; }
     </style>
 </head>
 <body>
-    <h1>🔍 青馬轉車站（往機場方向）真・密碼探測器</h1>
-    <p>正在實時向九巴數據庫索取路線圖，請稍候...</p>
-    <div id="log"></div>
+    <h1>🔍 青馬轉車站（雙向地毯式）密碼探測器</h1>
+    <p>正在同時轟炸去程與回程數據庫，幫你揪出正確路線...</p>
+    <div id="log">正在連線到龍運 API...</div>
 
 <script>
-    const routes = [
-        { name: "E42", bound: "inbound" },
-        { name: "E36S", bound: "inbound" },
-        { name: "E32", bound: "inbound" },
-        { name: "E41", bound: "inbound" }
-    ];
+    const routes = ["E42", "E36S", "E32", "E41"];
+    const bounds = ["outbound", "inbound"];
 
     async function probe() {
         const logDiv = document.getElementById('log');
         logDiv.innerHTML = '';
 
         for (let r of routes) {
-            let html = `<div class="route-block"><h2>巴士路線: ${r.name} (往機場/航天城方向)</h2>`;
-            try {
-                // 1. 先拿整條線的所有車站列表
-                let res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route-stop/${r.name}/${r.bound}`);
-                let json = await res.json();
-                
-                if (!json.data || json.data.length === 0) {
-                    html += `<p style="color:#ef4444;">❌ 找不到這條路線的數據，可能方向(Bound)定義不對</p></div>`;
-                    logDiv.innerHTML += html;
-                    continue;
-                }
-
-                html += `<ul>`;
-                // 2. 逐個站抓名字，找出「青嶼幹線」
-                for (let stopInfo of json.data) {
-                    let stopRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop/${stopInfo.stop}`);
-                    let stopJson = await stopRes.json();
-                    let stopName = stopJson.data.name_tc;
-
-                    if (stopName.includes("青嶼幹線")) {
-                        html += `<li class="match">👉 站序: ${stopInfo.seq} | 車站: ${stopName} | Stop ID (真密碼): ${stopInfo.stop} 👈</li>`;
-                    } else {
-                        html += `<li style="color:#666;">站序: ${stopInfo.seq} | 車站: ${stopName}</li>`;
+            let html = `<div class="route-block"><h2>巴士路線: ${r}</h2>`;
+            
+            for (let b of bounds) {
+                html += `<div class="direction-title">🧭 探測方向: ${b.toUpperCase()}</div>`;
+                try {
+                    let res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route-stop/${r}/${b}`);
+                    let json = await res.json();
+                    
+                    if (!json.data || json.data.length === 0) {
+                        html += `<p class="error">❌ 此方向無數據 (404)</p>`;
+                        continue;
                     }
-                }
-                html += `</ul></div>`;
-            } catch (e) {
-                html += `<p style="color:#ef4444;">連線出錯: ${e.message}</p></div>`;
-            }
-            logDiv.innerHTML += html;
-        }
-    }
 
-    probe();
-</script>
-</body>
-</html>
+                    let foundAny = false;
+                    html += `<ul>`;
+                    
+                    // 逐個
