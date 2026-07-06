@@ -2,147 +2,57 @@
 <html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>烏溪沙站即時到站時間</title>
+    <title>港鐵班次測試（大圍站）</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #f5f5f7;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-        .container {
-            background: #ffffff;
-            border-radius: 16px;
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
-            padding: 25px;
-            width: 100%;
-            max-width: 450px;
-            border-top: 10px solid #9a3820; /* 屯馬綫 啡色 */
-        }
-        h1 {
-            color: #1d1d1f;
-            margin: 0 0 5px 0;
-            font-size: 22px;
-            text-align: center;
-        }
-        .update-time {
-            font-size: 13px;
-            color: #86868b;
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .train-item {
-            background: #fbfbfd;
-            border: 1px solid #d2d2d7;
-            border-left: 6px solid #0071e3;
-            padding: 15px;
-            margin-bottom: 12px;
-            border-radius: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .platform {
-            font-size: 12px;
-            color: #1d1d1f;
-            background: #e8e8ed;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-weight: 600;
-            display: inline-block;
-            margin-bottom: 5px;
-        }
-        .time-countdown {
-            font-size: 20px;
-            font-weight: bold;
-            color: #ff453a;
-            text-align: right;
-        }
-        .loading, .error {
-            text-align: center;
-            color: #86868b;
-            padding: 30px 10px;
-            font-size: 15px;
-        }
+        body { font-family: sans-serif; padding: 20px; background: #f0f2f5; }
+        .card { background: white; padding: 20px; border-radius: 8px; max-width: 400px; margin: auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .train { background: #f8f9fa; border-left: 5px solid #007bff; padding: 10px; margin: 10px 0; border-radius: 4px; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>烏溪沙站 班次顯示</h1>
-    <div class="update-time" id="update-time">最後更新: 載入中...</div>
-    <div id="content"><div class="loading">正在連線到港鐵系統...</div></div>
+<div class="card">
+    <h2>大圍站 (測試用)</h2>
+    <p id="time">正在載入...</p>
+    <div id="list"></div>
 </div>
 
 <script>
-    // 轉用港鐵官方直接 API 網址，避免部分政府資料一線通嘅跳轉問題
-    const apiURL = "https://rt.data.gov.hk/v1/transport/mtr/getSchedule.php?line=TML&sta=WKS";
+    // 轉用大圍站 (TAW)，因為班次極多，最容易測試到個 HTML 運作起唔起到
+    const url = "https://rt.data.gov.hk/v1/transport/mtr/getSchedule.php?line=TML&sta=TAW";
 
-    async function fetchMTR() {
+    async function checkMTR() {
         try {
-            // 加埋 cache: "no-cache" 確保每次都拎最新數據
-            const response = await fetch(apiURL, { cache: "no-cache" });
-            const json = await response.json();
+            const res = await fetch(url);
+            const json = await res.json();
             
-            // 港鐵 API 成功會回傳 status: 1
-            if (json.status === 1 && json.data && json.data["TML-WKS"]) {
-                renderUI(json.data["TML-WKS"]);
-            } else {
-                showMsg(json.message || "目前未有列車班次資料（可能已收車）。");
+            document.getElementById('time').innerText = "最後更新: " + json.data["TML-TAW"].curr_time;
+            
+            // 大圍站有分 UP (往烏溪沙) 同 DOWN (往屯門)
+            // 我哋先拎 UP (往烏溪沙方向) 嚟做測試
+            const trains = json.data["TML-TAW"].UP || [];
+            
+            if(trains.length === 0) {
+                document.getElementById('list').innerHTML = "目前沒有班次數據。";
+                return;
             }
-        } catch (err) {
-            console.error(err);
-            showMsg("連線失敗，請檢查網路，或試下用瀏覽器開「無痕模式」再試。");
+            
+            let html = "";
+            trains.forEach(t => {
+                html += `<div class="train">
+                    <b>往 烏溪沙</b><br>
+                    月台: ${t.plat} | 倒數: ${t.ttnt} 分鐘 (${t.time.substring(11,16)})
+                </div>`;
+            });
+            document.getElementById('list').innerHTML = html;
+            
+        } catch(e) {
+            document.getElementById('list').innerHTML = "連線出錯: " + e;
         }
     }
 
-    function renderUI(stationData) {
-        const content = document.getElementById('content');
-        document.getElementById('update-time').innerText = `最後更新: ${stationData.curr_time || new Date().toLocaleTimeString()}`;
-
-        // 烏溪沙係終點站，列車開出通常只有 DOWN (下行往屯門方向)
-        const trains = stationData.DOWN || [];
-
-        if (trains.length === 0) {
-            showMsg("現時未有即將開出嘅班次。");
-            return;
-        }
-
-        let html = '';
-        trains.forEach(t => {
-            // ttnt 係到站倒數分鐘
-            let countdown = t.ttnt === "0" ? "即將開出" : `${t.ttnt} 分鐘`;
-            let formattedTime = t.time ? t.time.substring(11, 16) : "--:--"; // 只攞 14:35 格式
-
-            html += `
-                <div class="train-item">
-                    <div>
-                        <div style="font-size: 16px; font-weight: 600;">往 屯門</div>
-                        <div style="font-size: 13px; color: #86868b; margin-top: 4px;">開出時間 ${formattedTime}</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <span class="platform">${t.plat} 號月台</span>
-                        <div class="time-countdown">${countdown}</div>
-                    </div>
-                </div>
-            `;
-        });
-        content.innerHTML = html;
-    }
-
-    function showMsg(msg) {
-        document.getElementById('content').innerHTML = `<div class="error">${msg}</div>`;
-    }
-
-    // 啟動
-    fetchMTR();
-    // 每 20 秒自動更新
-    setInterval(fetchMTR, 20000);
+    checkMTR();
+    setInterval(checkMTR, 20000);
 </script>
 
 </body>
