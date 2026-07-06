@@ -113,7 +113,7 @@
     <h1>✈️ 機場巴士實時顯示屏</h1>
     <div class="update-time" id="update-time">最後更新: 正在初始化...</div>
     <div id="content">
-        <div class="loading">正在優化巴士數據庫，請稍候...</div>
+        <div class="loading">正在防禦影分身數據，請稍候...</div>
     </div>
 </div>
 
@@ -168,19 +168,26 @@
                 
                 let rawList = json.data.filter(item => item.route === bus.route && item.dir === bus.dir && item.eta);
 
-                // 按時間排序
+                // 先按時間排序
                 rawList.sort((a, b) => new Date(a.eta) - new Date(b.eta));
 
-                // 【核心修正】強力去重：確保同一個時間只會出現一次，消滅影分身！
-                let seenTimes = new Set();
+                // 【終極強力去重】用「倒數分鐘數」來做唯一對比，只要相差小於 2 分鐘，通通當作同一班車過濾掉！
                 let etaList = [];
-                for (let item of rawList) {
-                    let timeStr = item.eta.substring(11, 16);
-                    if (!seenTimes.has(timeStr)) {
-                        seenTimes.add(timeStr);
+                rawList.forEach(item => {
+                    const etaTime = new Date(item.eta);
+                    const diffMins = Math.max(0, Math.floor((etaTime - now) / 1000 / 60));
+                    
+                    // 檢查是否已經有差不多時間的車在陣列裏了
+                    let isDuplicate = etaList.some(existingItem => {
+                        const existingEta = new Date(existingItem.eta);
+                        const existingMins = Math.max(0, Math.floor((existingEta - now) / 1000 / 60));
+                        return Math.abs(existingMins - diffMins) <= 1; // 相差 1 分鐘內都算重覆
+                    });
+
+                    if (!isDuplicate) {
                         etaList.push(item);
                     }
-                }
+                });
 
                 htmlContent += `
                     <div class="bus-route-box">
@@ -197,5 +204,47 @@
                 if (etaList.length === 0) {
                     htmlContent += `<li class="eta-item" style="color:#64748b;justify-content:center;padding:10px 0;">暫時未有班次資料</li>`;
                 } else {
-                    // 顯示最多 3 班真正不同的車
-                    etaList.slice(0, 3).
+                    // 顯示最多 3 班真正獨立的後續班次
+                    etaList.slice(0, 3).forEach((item, index) => {
+                        const etaTime = new Date(item.eta);
+                        const diffMs = etaTime - now;
+                        const diffMins = Math.max(0, Math.floor(diffMs / 1000 / 60));
+                        
+                        let countdownStr = diffMins === 0 ? "即將開出" : `${diffMins} MINS`;
+                        let timeStr = item.eta.substring(11, 16);
+
+                        htmlContent += `
+                            <li class="eta-item">
+                                <span class="eta-time">⏱️ 預計開出: ${timeStr}</span>
+                                <span class="eta-countdown ${index === 0 ? 'next-bus' : ''}">${countdownStr}</span>
+                            </li>
+                        `;
+                    });
+                }
+
+                htmlContent += `</ul></div>`;
+
+            } catch (error) {
+                console.error(error);
+                htmlContent += `
+                    <div class="bus-route-box">
+                        <div class="bus-header"><span class="route-num">${bus.route}</span></div>
+                        <div style="color:#ef4444; font-size:13px; padding:10px 0;">訊號中斷</div>
+                    </div>`;
+            }
+        }
+
+        contentDiv.innerHTML = htmlContent;
+    }
+
+    async function startApp() {
+        await autoDiscoverStopIds();
+        await fetchAllETA();
+        setInterval(fetchAllETA, 30000);
+    }
+
+    startApp();
+</script>
+
+</body>
+</html>
