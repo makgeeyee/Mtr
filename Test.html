@@ -2,83 +2,83 @@
 <html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
-    <title>青馬轉車站實時數據倒模器</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>機場及國泰城巴士實時顯示屏</title>
     <style>
-        body { font-family: -apple-system, monospace; background: #0f172a; color: #f1f5f9; padding: 20px; }
-        .box { border: 2px solid #334155; padding: 15px; margin-bottom: 20px; border-radius: 8px; background: #1e293b; }
-        h2 { color: #f97316; margin-top: 0; font-size: 18px; }
-        .found { color: #4ade80; font-weight: bold; background: #14532d; padding: 4px 8px; border-radius: 4px; display: inline-block; }
-        .error { color: #f87171; }
-        .info { color: #38bdf8; }
-        ul { padding-left: 20px; }
-    </style>
-</head>
-<body>
-    <h1>🔍 青馬轉車站「實時到站」密碼倒模器</h1>
-    <p>既然拿路線圖會 404，我哋直接用 A41P 去機場方向做誘餌，直接去查「果個站」依家有咩車經過！</p>
-    <div id="log">正在追蹤 A41P 往機場方向的軌跡...</div>
-
-<script>
-    async function probe() {
-        const logDiv = document.getElementById('log');
-        logDiv.innerHTML = '<p class="info">⏳ 第一步：正在從 A41P 去程路線搵「青嶼幹線轉車站」嘅真身...</p>';
-        
-        try {
-            // 1. 先用絕對行得通嘅 A41P 去程，撈出中途站
-            let res = await fetch("https://data.etabus.gov.hk/v1/transport/kmb/route-stop/A41P/outbound");
-            let json = await res.json();
-            
-            let targetStopId = null;
-            
-            for (let item of json.data) {
-                let stopRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop/${item.stop}`);
-                let stopJson = await stopRes.json();
-                if (stopJson.data && stopJson.data.name_tc.includes("青嶼幹線")) {
-                    targetStopId = item.stop;
-                    break;
-                }
-            }
-            
-            if (!targetStopId) {
-                logDiv.innerHTML += '<p class="error">❌ 居然連 A41P 沿途都找不到叫「青嶼幹線」嘅站？系統有變！</p>';
-                return;
-            }
-            
-            logDiv.innerHTML += `<p class="found">🎯 成功捕捉實體車站 ID: <code>${targetStopId}</code></p>`;
-            logDiv.innerHTML += '<p class="info">⏳ 第二步：正在轟炸呢個車站，倒模緊依家有咩巴士線正衝過來...</p>';
-            
-            // 2. 直接去查呢個站嘅實時 ETA
-            let etaRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${targetStopId}`);
-            let etaJson = await etaRes.json();
-            
-            if (!etaJson.data || etaJson.data.length === 0) {
-                logDiv.innerHTML += '<p class="error">⚠️ 呢個車站目前沒有任何實時到站數據吐出。</p>';
-                return;
-            }
-            
-            // 3. 把所有正在停靠/即將抵達呢個站嘅路線、方向、定義列出來
-            let html = '<h3>📋 倒模結果：呢個站目前收到以下路線嘅實時訊號：</h3><ul>';
-            
-            // 用 Set 來去重，方便肉眼看
-            let seen = new Set();
-            
-            etaJson.data.forEach(item => {
-                let key = `${item.route}-${item.dir}`;
-                if (!seen.has(key)) {
-                    seen.add(key);
-                    html += `<li><strong>路線: <span style="color:#facc15; font-size:18px;">${item.route}</span></strong> | 官方方向代號 (dir): <span style="color:#38bdf8;">"${item.dir}"</span> </li>`;
-                }
-            });
-            
-            html += '</ul><p class="info">💡 請幫我睇睇呢個列表入面，你有需要嘅 E42、E36S、E32、E41 有冇喺度？佢哋對應嘅 dir 係 "O" 定 "I"？</p>';
-            logDiv.innerHTML += html;
-            
-        } catch (e) {
-            logDiv.innerHTML += `<p class="error">❌ 出錯: ${e.message}</p>`;
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            background-color: #0f172a; 
+            margin: 0; 
+            padding: 15px; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
         }
-    }
-
-    probe();
-</script>
-</body>
-</html>
+        .container { 
+            background: #1e293b; 
+            border-radius: 16px; 
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); 
+            padding: 20px; 
+            width: 100%; 
+            max-width: 450px; 
+            border-top: 8px solid #f97316; 
+        }
+        h1 { 
+            color: #f8fafc; 
+            margin: 0 0 5px 0; 
+            font-size: 20px; 
+            text-align: center;
+            letter-spacing: 1px;
+        }
+        .update-time { 
+            font-size: 12px; 
+            color: #94a3b8; 
+            text-align: center; 
+            margin-bottom: 20px; 
+        }
+        .bus-route-box { 
+            background: #0f172a; 
+            border: 1px solid #334155; 
+            padding: 15px; 
+            margin-bottom: 15px; 
+            border-radius: 12px; 
+        }
+        .bus-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            border-bottom: 1px solid #334155; 
+            padding-bottom: 8px; 
+            margin-bottom: 10px; 
+        }
+        .route-num { 
+            font-size: 26px; 
+            font-weight: 900; 
+            color: #f97316; 
+            background: #292524;
+            padding: 2px 10px;
+            border-radius: 6px;
+        }
+        .route-dest { 
+            font-size: 13px; 
+            color: #f1f5f9; 
+            font-weight: 600; 
+            text-align: right; 
+        }
+        .station-loc { 
+            font-size: 11px; 
+            color: #38bdf8; 
+            display: block; 
+            margin-top: 3px; 
+        }
+        .eta-list { 
+            list-style: none; 
+            padding: 0; 
+            margin: 0; 
+        }
+        .eta-item { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 10px
