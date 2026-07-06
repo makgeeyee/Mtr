@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MTR 石硤尾站即時到站顯示屏</title>
+    <title>我的專屬實時到站顯示屏</title>
     <style>
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
@@ -22,14 +22,32 @@
             padding: 20px; 
             width: 100%; 
             max-width: 450px; 
-            border-top: 8px solid #007bf2; 
+            border-top: 8px solid #38bdf8; 
         }
-        h1 { 
-            color: #f8fafc; 
-            margin: 0 0 5px 0; 
-            font-size: 20px; 
-            text-align: center;
-            letter-spacing: 1px;
+        /* 切換頁籤 Tab 樣式 */
+        .tab-box {
+            display: flex;
+            background: #0f172a;
+            padding: 4px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .tab-btn {
+            flex: 1;
+            background: none;
+            border: none;
+            color: #94a3b8;
+            padding: 10px 5px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            background: #1e293b;
+            color: #f8fafc;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
         .update-time { 
             font-size: 12px; 
@@ -37,14 +55,14 @@
             text-align: center; 
             margin-bottom: 20px; 
         }
-        .platform-box { 
+        .data-box { 
             background: #0f172a; 
             border: 1px solid #334155; 
             padding: 15px; 
             margin-bottom: 15px; 
             border-radius: 12px; 
         }
-        .platform-header { 
+        .data-header { 
             display: flex; 
             justify-content: space-between; 
             align-items: center; 
@@ -52,25 +70,23 @@
             padding-bottom: 8px; 
             margin-bottom: 10px; 
         }
-        .line-badge { 
-            font-size: 14px; 
+        .badge { 
+            font-size: 13px; 
             font-weight: bold; 
             color: #fff; 
-            background: #007b43; 
-            padding: 4px 10px;
+            padding: 3px 10px;
             border-radius: 20px;
         }
-        .platform-dest { 
-            font-size: 15px; 
+        .badge.mtr { background: #007b43; } /* MTR 觀塘綫綠色 */
+        .badge.bus { background: #f97316; } /* 巴士橘色 */
+        
+        .dest-title { 
+            font-size: 14px; 
             color: #f1f5f9; 
             font-weight: bold; 
             text-align: right; 
         }
-        .eta-list { 
-            list-style: none; 
-            padding: 0; 
-            margin: 0; 
-        }
+        .eta-list { list-style: none; padding: 0; margin: 0; }
         .eta-item { 
             display: flex; 
             justify-content: space-between; 
@@ -80,137 +96,60 @@
             border-bottom: 1px dashed #1e293b;
         }
         .eta-item:last-child { border-bottom: none; }
-        .eta-plat {
-            color: #94a3b8;
-            font-size: 13px;
-        }
-        .eta-countdown { 
-            font-weight: bold; 
-            color: #38bdf8; 
-            font-family: monospace;
-            font-size: 16px;
-        }
-        .next-train { 
-            color: #facc15; 
-        }
-        .loading { 
-            text-align: center; 
-            color: #94a3b8; 
-            padding: 30px; 
-            font-size: 14px;
-        }
+        .sub-text { color: #94a3b8; font-size: 13px; }
+        .countdown { font-weight: bold; color: #38bdf8; font-family: monospace; font-size: 16px; }
+        .next-one { color: #facc15; }
+        .loading { text-align: center; color: #94a3b8; padding: 30px; font-size: 14px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>🚇 石硤尾站實時顯示屏</h1>
-    <div class="update-time" id="update-time">最後更新: 正在初始化...</div>
-    <div id="content">
-        <div class="loading">正在防禦跨網域鎖定，載入中...</div>
+    <div class="tab-box">
+        <button class="tab-btn active" onclick="switchTab('mtr')">🚇 石硤尾站</button>
+        <button class="tab-btn" onclick="switchTab('bus')">✈️ 青馬轉車站 (TW602/603)</button>
     </div>
+
+    <div class="update-time" id="update-time">最後更新: 正在初始化...</div>
+    <div id="content"><div class="loading">正在載入數據...</div></div>
 </div>
 
 <script>
-    const STATION = "SKM";
-    const LINE = "KTL";
+    let currentMode = 'mtr'; 
+    let timer = null;
 
-    async function fetchMtrETA() {
-        const contentDiv = document.getElementById('content');
-        const now = new Date();
-        
-        document.getElementById('update-time').innerText = `最後更新: ${now.toLocaleTimeString()}`;
-
-        // 使用多重備用 URL (原生 API 混搭公共防禦 Proxy)
-        const urls = [
-            `https://rt.data.gov.hk/v1/transport/mtr/getETA.php?line=${LINE}&station=${STATION}`,
-            `https://api.allorigins.win/get?url=${encodeURIComponent(`https://rt.data.gov.hk/v1/transport/mtr/getETA.php?line=${LINE}&station=${STATION}`)}`
-        ];
-
-        let json = null;
-        let isProxy = false;
-
-        // 嘗試流暢切換
-        for (let i = 0; i < urls.length; i++) {
-            try {
-                const response = await fetch(urls[i]);
-                if (response.ok) {
-                    const resData = await response.json();
-                    // 如果是第二條 proxy 路線，包裝會有所不同
-                    if (i === 1 && resData.contents) {
-                        json = JSON.parse(resData.contents);
-                        isProxy = true;
-                    } else {
-                        json = resData;
-                    }
-                    break;
-                }
-            } catch (err) {
-                console.log(`路線 ${i+1} 失敗，正在嘗試下一條防線...`);
-            }
-        }
-        
-        // 渲染畫面
-        if (!json || !json.data || !json.data[`${LINE}-${STATION}`]) {
-            contentDiv.innerHTML = `<div class="loading">❌ 港鐵伺服器拒絕回應，請稍後重試</div>`;
-            return;
-        }
-
-        const stationData = json.data[`${LINE}-${STATION}`];
-        let htmlContent = '';
-
-        const directions = [
-            { key: "UP", title: "往 調景嶺 方向" },
-            { key: "DOWN", title: "往 黃埔 方向" }
-        ];
-
-        directions.forEach(dir => {
-            const trainList = stationData[dir.key] || [];
-            
-            htmlContent += `
-                <div class="platform-box">
-                    <div class="platform-header">
-                        <span class="line-badge">觀塘綫</span>
-                        <span class="platform-dest">${dir.title}</span>
-                    </div>
-                    <ul class="eta-list">
-            `;
-
-            if (trainList.length === 0) {
-                htmlContent += `<li class="eta-item" style="color:#64748b;justify-content:center;padding:10px 0;">暫無實時班次資料</li>`;
-            } else {
-                trainList.forEach((train, index) => {
-                    const ttnt = parseInt(train.ttnt);
-                    let countdownStr = '';
-                    
-                    if (ttnt === 0) {
-                        countdownStr = "即將到站";
-                    } else if (ttnt === 1) {
-                        countdownStr = "1 MIN";
-                    } else {
-                        countdownStr = `${ttnt} MINS`;
-                    }
-
-                    const plat = train.plat;
-
-                    htmlContent += `
-                        <li class="eta-item">
-                            <span class="eta-plat">Platform ${plat}</span>
-                            <span class="eta-countdown ${index === 0 && ttnt <= 1 ? 'next-train' : ''}">${countdownStr}</span>
-                        </li>
-                    `;
-                });
-            }
-
-            htmlContent += `</ul></div>`;
-        });
-
-        contentDiv.innerHTML = htmlContent;
+    function switchTab(mode) {
+        currentMode = mode;
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        if(mode === 'mtr') document.querySelectorAll('.tab-btn')[0].classList.add('active');
+        if(mode === 'bus') document.querySelectorAll('.tab-btn')[1].classList.add('active');
+        refreshData();
     }
 
-    fetchMtrETA();
-    setInterval(fetchMtrETA, 30000);
-</script>
+    async function refreshData() {
+        const contentDiv = document.getElementById('content');
+        const now = new Date();
+        document.getElementById('update-time').innerText = `最後更新: ${now.toLocaleTimeString()}`;
 
-</body>
-</html>
+        if (currentMode === 'mtr') {
+            // ========= 🚇 石硤尾站 MTR 邏輯 (帶防禦 Proxy) =========
+            const url = `https://api.allorigins.win/get?url=${encodeURIComponent('https://rt.data.gov.hk/v1/transport/mtr/getETA.php?line=KTL&station=SKM')}`;
+            try {
+                const res = await fetch(url);
+                const resData = await res.json();
+                const json = JSON.parse(resData.contents);
+                const stationData = json.data["KTL-SKM"];
+                
+                let html = '';
+                const dirs = [{key:"UP", title:"往 調景嶺"}, {key:"DOWN", title:"往 黃埔"}];
+                
+                dirs.forEach(d => {
+                    const trains = stationData[d.key] || [];
+                    html += `<div class="data-box">
+                        <div class="data-header"><span class="badge mtr">觀塘綫</span><span class="dest-title">${d.title}</span></div>
+                        <ul class="eta-list">`;
+                    if(trains.length === 0) {
+                        html += `<li class="eta-item" style="color:#64748b;justify-content:center;">暫無實時班次</li>`;
+                    } else {
+                        trains.forEach((t, i) => {
+                            let countdown =
