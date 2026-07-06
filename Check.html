@@ -3,58 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>交通顯示屏</title>
+    <title>石硤尾站實時到站</title>
     <style>
-        body { font-family: sans-serif; background: #0f172a; color: white; padding: 20px; }
-        .tab-box { display: flex; gap: 10px; margin-bottom: 20px; }
-        .tab-btn { padding: 10px; cursor: pointer; border: none; border-radius: 5px; }
-        .active { background: #f97316; }
-        .data-box { background: #1e293b; padding: 15px; margin-bottom: 10px; border-radius: 10px; }
+        body { font-family: sans-serif; background-color: #0f172a; color: #f8fafc; padding: 20px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 400px; }
+        .data-box { background: #1e293b; padding: 15px; border-radius: 12px; margin-bottom: 10px; border-left: 6px solid #8cc63f; } /* 觀塘綫綠色 */
+        .title { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+        .eta-item { display: flex; justify-content: space-between; padding: 5px 0; font-size: 16px; }
+        .loading { text-align: center; color: #94a3b8; margin-top: 20px; }
     </style>
 </head>
 <body>
 
-<div class="tab-box">
-    <button class="tab-btn active" onclick="show(1)">初始班車</button>
-    <button class="tab-btn" onclick="show(2)">青馬班車</button>
-</div>
-
-<div id="tab1">
-    <div id="bus-list-1">載入中...</div>
-</div>
-
-<div id="tab2" style="display:none;">
-    <div id="bus-list-2">載入中...</div>
+<div class="container">
+    <div class="title">🚇 石硤尾站 (觀塘綫)</div>
+    <div id="mtr-content"><div class="loading">正在擷取 MTR 數據...</div></div>
 </div>
 
 <script>
-    function show(n) {
-        document.getElementById('tab1').style.display = (n==1 ? 'block' : 'none');
-        document.getElementById('tab2').style.display = (n==2 ? 'block' : 'none');
-    }
+    async function getMTR() {
+        try {
+            // 石硤尾站代碼: SKM, 觀塘綫: KTL
+            const response = await fetch('https://rt.data.gov.hk/v1/transport/mtr/getETA.php?line=KTL&station=SKM');
+            const json = await response.json();
+            const data = json.data["KTL-SKM"];
+            
+            let html = '';
+            
+            // 處理往黃埔方向 (UP)
+            html += `<div class="data-box"><div>往黃埔方向</div>`;
+            data.UP.forEach(t => {
+                html += `<div class="eta-item"><span>月台 ${t.plat}</span><span>${t.ttnt} 分鐘</span></div>`;
+            });
+            html += `</div>`;
 
-    async function update() {
-        // TAB 1 的原始數據請求 (保留你原本的邏輯)
-        const stopIds = ["6C98380DB80A2A7B", "A63604C5A13E53AA", "17208E20FC5E0C25"];
-        let html1 = '';
-        for(let id of stopIds) {
-            let res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${id}`);
-            let json = await res.json();
-            html1 += `<div class="data-box">${json.data ? '有數據' : '暫無'} - ${id}</div>`;
+            // 處理往調景嶺方向 (DOWN)
+            html += `<div class="data-box"><div>往調景嶺方向</div>`;
+            data.DOWN.forEach(t => {
+                html += `<div class="eta-item"><span>月台 ${t.plat}</span><span>${t.ttnt} 分鐘</span></div>`;
+            });
+            html += `</div>`;
+            
+            document.getElementById('mtr-content').innerHTML = html;
+        } catch (e) {
+            document.getElementById('mtr-content').innerHTML = `<div class="loading">連線錯誤，請稍後重試</div>`;
         }
-        document.getElementById('bus-list-1').innerHTML = html1;
-
-        // TAB 2 的青馬數據請求
-        const bbiIds = ["DBB6D5D26FF3D909", "8394FFF35F9D2EFB"];
-        let html2 = '';
-        for(let id of bbiIds) {
-            let res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${id}`);
-            let json = await res.json();
-            html2 += `<div class="data-box">青馬月台 ${id}: ${json.data ? '成功獲取' : '失敗'}</div>`;
-        }
-        document.getElementById('bus-list-2').innerHTML = html2;
     }
-    update();
+    
+    getMTR();
+    setInterval(getMTR, 30000); // 30秒更新一次
 </script>
 </body>
 </html>
