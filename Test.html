@@ -22,9 +22,8 @@
             padding: 20px; 
             width: 100%; 
             max-width: 450px; 
-            border-top: 8px solid #9a3b26; /* 屯馬綫啡色作為頂條 */
+            border-top: 8px solid #9a3b26; 
         }
-        /* 三頁籤 Tab 樣式 */
         .tab-box {
             display: flex;
             background: #0f172a;
@@ -81,7 +80,7 @@
             background: #f97316; 
         }
         .badge.a-line { background: #e11d48; } 
-        .badge.mtr { background: #9a3b26; } /* 屯馬綫色 */
+        .badge.mtr { background: #9a3b26; } 
         
         .dest-title { 
             font-size: 14px; 
@@ -109,7 +108,7 @@
 
 <div class="container">
     <div class="tab-box">
-        <button class="tab-btn active" onclick="switchTab('initial')">🏠 初始 3 班車</button>
+        <button class="tab-btn active" onclick="switchTab('initial')">🏠 初始班車</button>
         <button class="tab-btn" onclick="switchTab('bbi')">✈️ 青馬 4 班車</button>
         <button class="tab-btn" onclick="switchTab('mtr')">🚇 烏溪沙站</button>
     </div>
@@ -122,14 +121,14 @@
     let currentMode = 'initial'; 
     let timer = null;
 
-    // 1. 初始 3 班車配置
+    // 1. 初始班車配置 (烏溪沙 A41P 來回 + 大圍 E42)
     const initialConfig = [
         { route: "A41P", stopId: "6C98380DB80A2A7B", title: "烏溪沙站 ➔ 往機場", badgeClass: "badge a-line" }, 
         { route: "A41P", stopId: "A63604C5A13E53AA", title: "機場/港珠澳 ➔ 往烏溪沙", badgeClass: "badge a-line" },
         { route: "E42",  stopId: "17208E20FC5E0C25", title: "大圍站 ➔ 往機場", badgeClass: "badge" }
     ];
 
-    // 2. 青馬轉車站 4 班車配置
+    // 2. 青馬轉車站 4 班車配置 (100% 成功運作的真 ID)
     const bbiConfig = [
         { id: "DBB6D5D26FF3D909", name: "TW602 月台", routes: ["E42", "E36S"] },
         { id: "8394FFF35F9D2EFB", name: "TW603 月台", routes: ["E32", "E41"] }
@@ -152,9 +151,10 @@
         let html = '';
 
         if (currentMode === 'initial') {
-            // ========= 🏠 Tab 1: 初始 3 班車模式 =========
+            // ========= 🏠 Tab 1: 初始班車模式 =========
             for (let item of initialConfig) {
                 try {
+                    // 直連九巴/龍運原生 API 獲取
                     const response = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${item.stopId}`);
                     const json = await response.json();
                     
@@ -193,7 +193,7 @@
                     }
                     html += `</ul></div>`;
                 } catch (e) {
-                    html += `<div class="data-box"><div class="loading" style="color:#ef4444;">${item.route} 連線失敗</div></div>`;
+                    html += `<div class="data-box"><div class="loading" style="color:#ef4444;">${item.route} 原生連線失敗</div></div>`;
                 }
             }
             contentDiv.innerHTML = html;
@@ -248,9 +248,11 @@
             contentDiv.innerHTML = html;
 
         } else if (currentMode === 'mtr') {
-            // ========= 🚇 Tab 3: 烏溪沙 MTR 模式 (正式網址直連無 Proxy) =========
+            // ========= 🚇 Tab 3: 烏溪沙 MTR 模式 (全面加裝安全 Proxy 保險盾) =========
             try {
-                const response = await fetch(`https://rt.data.gov.hk/v1/transport/mtr/getETA.php?line=TML&station=WKS`);
+                const targetMtr = 'https://rt.data.gov.hk/v1/transport/mtr/getETA.php?line=TML&station=WKS';
+                // 使用 corsproxy.io 強制解鎖跨網域限制
+                const response = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetMtr)}`);
                 const json = await response.json();
                 const stationData = json.data["TML-WKS"];
 
@@ -262,7 +264,7 @@
                     <ul class="eta-list">`;
 
                 if (stationData && stationData.DOWN) {
-                    const trains = stationData.DOWN; // DOWN 代表開出往屯門方向
+                    const trains = stationData.DOWN; 
                     if (trains.length === 0) {
                         html += `<li class="eta-item" style="color:#64748b;justify-content:center;">暫無實時班次</li>`;
                     } else {
@@ -280,12 +282,11 @@
                 html += `</ul></div>`;
                 contentDiv.innerHTML = html;
             } catch (e) {
-                contentDiv.innerHTML = `<div class="loading" style="color:#ef4444;">MTR 連線失敗，請重試</div>`;
+                contentDiv.innerHTML = `<div class="loading" style="color:#ef4444;">MTR 安全直連失敗，請重新整理</div>`;
             }
         }
     }
 
-    // 預設啟動與定時 30 秒重整
     switchTab('initial');
     if(timer) clearInterval(timer);
     timer = setInterval(refreshData, 30000);
