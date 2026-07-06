@@ -3,39 +3,123 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>機場巴士即時到站</title>
+    <title>機場快綫巴士即時到站顯示屏</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f5f5f7; margin: 0; padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .container { background: #ffffff; border-radius: 16px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05); padding: 25px; width: 100%; max-width: 450px; border-top: 10px solid #ff5a00; }
-        h1 { color: #1d1d1f; margin: 0 0 5px 0; font-size: 22px; text-align: center; }
-        .update-time { font-size: 13px; color: #86868b; text-align: center; margin-bottom: 20px; }
-        .bus-route-box { background: #fbfbfd; border: 1px solid #d2d2d7; padding: 15px; margin-bottom: 15px; border-radius: 12px; }
-        .bus-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e8e8ed; padding-bottom: 8px; margin-bottom: 10px; }
-        .route-num { font-size: 24px; font-weight: bold; color: #ff5a00; }
-        .route-dest { font-size: 13px; color: #1d1d1f; font-weight: 600; text-align: right; }
-        .station-loc { font-size: 11px; color: #86868b; display: block; margin-top: 2px; }
-        .eta-list { list-style: none; padding: 0; margin: 0; }
-        .eta-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 15px; }
-        .eta-time { color: #86868b; font-size: 13px; }
-        .eta-countdown { font-weight: bold; color: #0071e3; }
-        .next-bus { color: #ff9500; }
-        .loading { text-align: center; color: #86868b; padding: 20px; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            background-color: #0f172a; 
+            margin: 0; 
+            padding: 15px; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+        }
+        .container { 
+            background: #1e293b; 
+            border-radius: 16px; 
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); 
+            padding: 20px; 
+            width: 100%; 
+            max-width: 450px; 
+            border-top: 8px solid #f97316; 
+        }
+        h1 { 
+            color: #f8fafc; 
+            margin: 0 0 5px 0; 
+            font-size: 20px; 
+            text-align: center;
+            letter-spacing: 1px;
+        }
+        .update-time { 
+            font-size: 12px; 
+            color: #94a3b8; 
+            text-align: center; 
+            margin-bottom: 20px; 
+        }
+        .bus-route-box { 
+            background: #0f172a; 
+            border: 1px solid #334155; 
+            padding: 15px; 
+            margin-bottom: 15px; 
+            border-radius: 12px; 
+        }
+        .bus-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            border-bottom: 1px solid #334155; 
+            padding-bottom: 8px; 
+            margin-bottom: 10px; 
+        }
+        .route-num { 
+            font-size: 26px; 
+            font-weight: 900; 
+            color: #f97316; 
+            background: #292524;
+            padding: 2px 10px;
+            border-radius: 6px;
+        }
+        .route-dest { 
+            font-size: 13px; 
+            color: #f1f5f9; 
+            font-weight: 600; 
+            text-align: right; 
+        }
+        .station-loc { 
+            font-size: 11px; 
+            color: #38bdf8; 
+            display: block; 
+            margin-top: 3px; 
+        }
+        .eta-list { 
+            list-style: none; 
+            padding: 0; 
+            margin: 0; 
+        }
+        .eta-item { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 8px 0; 
+            font-size: 15px; 
+            border-bottom: 1px dashed #1e293b;
+        }
+        .eta-item:last-child { border-bottom: none; }
+        .eta-time { 
+            color: #94a3b8; 
+            font-size: 13px; 
+        }
+        .eta-countdown { 
+            font-weight: bold; 
+            color: #38bdf8; 
+            font-family: monospace;
+            font-size: 16px;
+        }
+        .next-bus { 
+            color: #facc15; 
+        }
+        .loading { 
+            text-align: center; 
+            color: #94a3b8; 
+            padding: 30px; 
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>機場巴士 到站時間</h1>
+    <h1>✈️ 機場巴士實時顯示屏</h1>
     <div class="update-time" id="update-time">最後更新: 載入中...</div>
-    <div id="content"><div class="loading">正在讀取九巴內部數據...</div></div>
+    <div id="content"><div class="loading">正在解密龍運巴士數據庫...</div></div>
 </div>
 
 <script>
-    // 使用挖出來的九巴真實車站 ID
+    // 【終極大結局】採用官方真正的龍運巴士 (LWB) 純數字編號
     const config = [
-        { route: "A41P", stopName: "烏溪沙站總站", stopId: "WU04-T-1000-0", title: "往 機場", dir: "O" },
-        { route: "A41P", stopName: "機場 (地面運輸中心)", stopId: "AI09-T-1100-0", title: "往 烏溪沙站", dir: "I" },
-        { route: "E42", stopName: "機場 (地面運輸中心)", stopId: "AI09-T-1100-0", title: "往 沙田 (博康)", dir: "I" }
+        { route: "A41P", stopName: "烏溪沙站總站", stopId: "3475", title: "往 機場 (地面運輸中心)", dir: "O" },
+        { route: "A41P", stopName: "機場 (地面運輸中心)", stopId: "3416", title: "往 烏溪沙站", dir: "I" },
+        { route: "E42", stopName: "機場 (地面運輸中心)", stopId: "3416", title: "往 沙田 (博康)", dir: "I" }
     ];
 
     async function fetchAllETA() {
@@ -47,12 +131,12 @@
 
         for (const bus of config) {
             try {
-                // 用內部 ID 讀取
+                // 注意：API 網址依然維持 data.etabus.gov.hk，但帶入純數字 Stop ID
                 const url = `https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${bus.stopId}`;
                 const response = await fetch(url);
                 const json = await response.json();
                 
-                // 篩選出該路線與特定方向
+                // 篩選特定路線、方向、且有機場班次時間的數據
                 let etaList = json.data.filter(item => item.route === bus.route && item.dir === bus.dir && item.eta);
 
                 // 排序
@@ -71,19 +155,19 @@
                 `;
 
                 if (etaList.length === 0) {
-                    htmlContent += `<li class="eta-item" style="color:#86868b;">暫時未有班次資料</li>`;
+                    htmlContent += `<li class="eta-item" style="color:#64748b;">暫時未有班次資料</li>`;
                 } else {
                     etaList.slice(0, 2).forEach((item, index) => {
                         const etaTime = new Date(item.eta);
                         const diffMs = etaTime - now;
                         const diffMins = Math.max(0, Math.floor(diffMs / 1000 / 60));
                         
-                        let countdownStr = diffMins === 0 ? "即將開出" : `${diffMins} 分鐘`;
+                        let countdownStr = diffMins === 0 ? "即將開出" : `${diffMins} MINS`;
                         let timeStr = item.eta.substring(11, 16);
 
                         htmlContent += `
                             <li class="eta-item">
-                                <span class="eta-time">預計時間: ${timeStr}</span>
+                                <span class="eta-time">班次時間: ${timeStr}</span>
                                 <span class="eta-countdown ${index === 0 ? 'next-bus' : ''}">${countdownStr}</span>
                             </li>
                         `;
@@ -97,7 +181,7 @@
                 htmlContent += `
                     <div class="bus-route-box">
                         <div class="bus-header"><span class="route-num">${bus.route}</span></div>
-                        <div style="color:red; font-size:13px;">連線失敗</div>
+                        <div style="color:#ef4444; font-size:13px;">訊號中斷</div>
                     </div>
                 `;
             }
