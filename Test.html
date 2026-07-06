@@ -2,104 +2,68 @@
 <html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
-    <title>青馬轉車站實時月台全數據轟炸器 (安全版)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>機場巴士實時轉乘顯示屏</title>
     <style>
-        body { font-family: -apple-system, monospace; background: #0f172a; color: #f1f5f9; padding: 20px; }
-        .box { border: 2px solid #334155; padding: 15px; margin-bottom: 20px; border-radius: 8px; background: #1e293b; }
-        h2 { color: #f97316; margin-top: 0; font-size: 18px; }
-        .found { color: #4ade80; font-weight: bold; background: #14532d; padding: 4px 8px; border-radius: 4px; display: inline-block; }
-        .error { color: #f87171; }
-        .info { color: #38bdf8; }
-        .data-row { background: #0f172a; padding: 10px; margin: 5px 0; border-radius: 6px; border-left: 4px solid #facc15; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            background-color: #0f172a; 
+            margin: 0; 
+            padding: 10px; 
+            color: #f1f5f9;
+        }
+        .container { 
+            max-width: 450px; 
+            margin: 0 auto; 
+        }
+        h1 { 
+            font-size: 18px; 
+            text-align: center; 
+            margin: 10px 0; 
+            color: #f97316;
+        }
+        .section-title {
+            font-size: 14px;
+            font-weight: bold;
+            padding: 5px 10px;
+            background: #1e293b;
+            border-left: 4px solid #facc15;
+            margin-top: 15px;
+            margin-bottom: 5px;
+            border-radius: 0 4px 4px 0;
+        }
+        /* 官方顯示屏容器 */
+        .kmb-frame-box {
+            width: 100%;
+            height: 280px; /* 剛好容納路線同頭三班車 */
+            border: 1px solid #334155;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #fff;
+            margin-bottom: 10px;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
     </style>
 </head>
 <body>
-    <h1>🔍 青馬轉車站全數據轟炸器 (防崩潰安全版)</h1>
-    <p>已經修復了 json.data undefined 嘅錯誤，今次實安全安全行完！</p>
-    <div id="log">正在連線...</div>
 
-<script>
-    async function probe() {
-        const logDiv = document.getElementById('log');
-        logDiv.innerHTML = '<p class="info">⏳ 正在跟隨 A41P 軌跡尋找基線「青嶼幹線轉車站」 ID...</p>';
-        
-        try {
-            // 1. 透過 A41P 搵出佢停靠嘅「青嶼幹線轉車站」ID
-            let res = await fetch("https://data.etabus.gov.hk/v1/transport/kmb/route-stop/A41P/outbound");
-            let json = await res.json();
-            
-            let a41pStopId = null;
-            if (json && json.data && Array.isArray(json.data)) {
-                for (let item of json.data) {
-                    let stopRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop/${item.stop}`);
-                    let stopJson = await stopRes.json();
-                    if (stopJson && stopJson.data && stopJson.data.name_tc.includes("青嶼幹線")) {
-                        a41pStopId = item.stop;
-                        break;
-                    }
-                }
-            }
-            
-            if (!a41pStopId) {
-                logDiv.innerHTML = '<p class="error">❌ 連 A41P 嘅青馬站都搵唔到，九巴 API 暫時無回應。</p>';
-                return;
-            }
-            
-            logDiv.innerHTML += `<p class="found">🎯 成功捕捉基線車站 ID: <code>${a41pStopId}</code></p>`;
-            logDiv.innerHTML += '<p class="info">⏳ 正在連環安全掃描多個測點，攔截 E42 / E36S / E32 / E41 嘅實時訊號...</p>';
-            
-            // 測試名單：包括 A41P 核心 ID，以及網上流傳嘅兩個疑似 ID
-            let testIds = [a41pStopId, "A3052E7BE53415D6", "D1658DB3850D95A4"];
-            
-            let htmlResult = '<h3>📋 實時攔截報告：</h3>';
-            let foundAnyTotal = false;
+<div class="container">
+    <h1>✈️ 青馬轉車站（往機場方向）官方即時屏</h1>
 
-            for (let id of testIds) {
-                htmlResult += `<div class="box"><p class="info">📡 正在掃描測點 ID: <code>${id}</code></p>`;
-                
-                try {
-                    let etaRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${id}`);
-                    let etaJson = await etaRes.json();
-                    
-                    // 🔥 安全防禦：確保 etaJson 存在且 etaJson.data 唔係 undefined 之後先做 filter
-                    if (etaJson && etaJson.data && Array.isArray(etaJson.data)) {
-                        let matchedLines = etaJson.data.filter(item => ["E42", "E36S", "E32", "E41"].includes(item.route));
-                        
-                        if (matchedLines.length > 0) {
-                            foundAnyTotal = true;
-                            matchedLines.forEach(item => {
-                                htmlResult += `
-                                    <div class="data-row">
-                                        🟢 <b>搵到數據！</b> 路線: <span style="color:#facc15;font-size:18px;">${item.route}</span> | 
-                                        方向 (dir): <span style="color:#38bdf8;">"${item.dir}"</span> | 
-                                        <b>真・Stop ID: <code>${id}</code></b><br>
-                                        ⏱️ 實時到站時間: ${item.eta ? item.eta.substring(11,16) : '暫無即時班次'}
-                                    </div>`;
-                            });
-                        } else {
-                            htmlResult += `<p style="color:#94a3b8;">⚠️ 呢個 ID 目前只有其他路線（暫無 E42/E36S/E32/E41 訊號）。</p>`;
-                        }
-                    } else {
-                        htmlResult += `<p class="error">❌ 呢個 ID 九巴回傳了無效的數據格式 (json.data 為空)</p>`;
-                    }
-                } catch (innerErr) {
-                    htmlResult += `<p class="error">❌ 讀取此 ID 失敗: ${innerErr.message}</p>`;
-                }
-                htmlResult += `</div>`;
-            }
-            
-            if (!foundAnyTotal) {
-                htmlResult += '<p class="error">🚨 報告：三個可能嘅測點都未能攔截到呢 4 架車。好可能龍運喺轉車站用咗完全意想不到嘅全新加密 ID。</p>';
-            }
-            
-            logDiv.innerHTML += htmlResult;
-            
-        } catch (e) {
-            logDiv.innerHTML += `<p class="error">❌ 核心邏輯出錯: ${e.message}</p>`;
-        }
-    }
+    <div class="section-title">🚌 TW602 月台 (E42, E36S 往機場/國泰城)</div>
+    <div class="kmb-frame-box">
+        <iframe src="https://search.kmb.hk/KMBWebSite/page.aspx?mode=eta&stop=TW06-T-1000-0"></iframe>
+    </div>
 
-    probe();
-</script>
+    <div class="section-title">🚌 TW603 月台 (E32, E41 往航天城/國泰城)</div>
+    <div class="kmb-frame-box">
+        <iframe src="https://search.kmb.hk/KMBWebSite/page.aspx?mode=eta&stop=TW06-T-1050-0"></iframe>
+    </div>
+</div>
+
 </body>
 </html>
