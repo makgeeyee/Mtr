@@ -2,28 +2,30 @@
 <html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
-    <title>烏溪沙站即時到站班次</title>
+    <title>烏溪沙站即時班次 (雙重保障版)</title>
     <style>
-        body { font-family: -apple-system, sans-serif; padding: 20px; background: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .card { background: white; padding: 25px; border-radius: 12px; width: 100%; max-width: 400px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border-top: 8px solid #9a3820; }
-        h2 { margin-top: 0; color: #333; text-align: center; }
-        .time { font-size: 13px; color: #666; text-align: center; margin-bottom: 20px; }
-        .train { background: #f8f9fa; border-left: 5px solid #28a745; padding: 15px; margin: 10px 0; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
+        body { font-family: -apple-system, sans-serif; padding: 20px; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; }
+        .card { background: white; padding: 20px; border-radius: 12px; width: 100%; max-width: 450px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border-top: 8px solid #9a3820; margin-bottom: 20px; }
+        h2 { margin-top: 0; color: #333; text-align: center; font-size: 20px; }
+        .time { font-size: 13px; color: #666; text-align: center; margin-bottom: 15px; }
+        .train { background: #f8f9fa; border-left: 5px solid #28a745; padding: 12px; margin: 8px 0; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
         .platform { background: #e9ecef; padding: 3px 8px; border-radius: 10px; font-size: 12px; }
         .countdown { font-weight: bold; color: #007bff; font-size: 18px; }
-        .waiting { text-align: center; color: #888; padding: 20px; font-style: italic; }
+        .waiting { text-align: center; color: #888; padding: 15px; font-style: italic; font-size: 14px; }
+        iframe { border: none; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); width: 100%; max-width: 450px; height: 550px; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>烏溪沙站 班次顯示</h2>
+    <h2>烏溪沙站 (數據版)</h2>
     <p id="time" class="time">正在載入...</p>
     <div id="list"></div>
 </div>
 
+<iframe src="https://www.mtr.com.hk/archive/ch/services/nexttrain/index.html?line=TML&station=WKS" scrolling="no"></iframe>
+
 <script>
-    // 轉返去烏溪沙站 (WKS)
     const url = "https://rt.data.gov.hk/v1/transport/mtr/getSchedule.php?line=TML&sta=WKS";
 
     async function checkMTR() {
@@ -32,14 +34,12 @@
             const json = await res.json();
             
             const stationData = json.data["TML-WKS"];
-            document.getElementById('time').innerText = "最後更新: " + stationData.curr_time;
+            document.getElementById('time').innerText = "最後更新: " + (stationData.curr_time || new Date().toLocaleTimeString());
             
-            // 總站開出屬於 DOWN (下行往屯門)
             const trains = stationData.DOWN || [];
             
             if(trains.length === 0) {
-                // 優化提示：等使用者知道程式冇死，純粹係總站咁啱未有車
-                document.getElementById('list').innerHTML = `<div class="waiting">暫時未有即將開出班次。<br><span style="font-size:12px;color:#aaa;">(總站列車調動中，請等候 20 秒自動刷新)</span></div>`;
+                document.getElementById('list').innerHTML = `<div class="waiting">API 暫時未有數據回傳。<br><span style="font-size:12px;color:#aaa;">請參考下方官方顯示屏 👇</span></div>`;
                 return;
             }
             
@@ -60,12 +60,12 @@
             document.getElementById('list').innerHTML = html;
             
         } catch(e) {
-            document.getElementById('list').innerHTML = "<div style='color:red;'>連線出錯: " + e + "</div>";
+            document.getElementById('list').innerHTML = "<div class="waiting">API 連線受阻，請看下方官方顯示屏 👇</div>";
         }
     }
 
     checkMTR();
-    setInterval(checkMTR, 20000); // 每 20 秒自動更新
+    setInterval(checkMTR, 20000);
 </script>
 
 </body>
