@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <title>九巴 A41P 路線車站實時探測器</title>
+    <style>
+        body { font-family: sans-serif; background: #0f172a; color: #f8fafc; padding: 20px; }
+        .station-item { background: #1e293b; padding: 10px; margin: 5px 0; border-radius: 6px; border-left: 5px solid #38bdf8; font-size: 14px; }
+        .highlight { color: #f97316; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h2>📋 A41P (往機場) 沿途所有巴士站真實代號</h2>
+    <div id="output">正在探測九巴伺服器...</div>
+
+<script>
+    async function probeKMB() {
+        try {
+            // 直接讀取 A41P 往機場方向 (Outbound) 的路線站牌清單
+            const url = "https://data.etabus.gov.hk/v1/transport/kmb/route-stop/A41P/outbound/1";
+            const response = await fetch(url);
+            const json = await response.json();
+            
+            let html = "<h4>請看看下面清單，哪一個是「烏溪沙站」？複製它的 Stop ID 給我：</h4>";
+            
+            // 逐個車站抓取名字
+            for (const item of json.data) {
+                // 讀取該站的詳細中文名稱
+                const stopUrl = `https://data.etabus.gov.hk/v1/transport/kmb/stop/${item.stop}`;
+                const stopRes = await fetch(stopUrl);
+                const stopJson = await stopRes.json();
+                const name = stopJson.data.name_tc;
+                
+                html += `<div class="station-item">
+                    站序: ${item.seq} | 
+                    車站名稱: <span class="highlight">${name}</span> | 
+                    <b>Stop ID (密碼):</b> <span style="color:#22c55e;">${item.stop}</span>
+                </div>`;
+            }
+            document.getElementById('output').innerHTML = html;
+        } catch (e) {
+            document.getElementById('output').innerHTML = "探測出錯: " + e;
+        }
+    }
+    probeKMB();
+</script>
+</body>
+</html>
