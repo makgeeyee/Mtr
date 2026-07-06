@@ -83,9 +83,7 @@
             align-items: center; 
             padding: 8px 0; 
             font-size: 15px; 
-            border-bottom: 1px dashed #1e293b;
         }
-        .eta-item:last-child { border-bottom: none; }
         .eta-time { 
             color: #94a3b8; 
             font-size: 13px; 
@@ -111,15 +109,15 @@
 <div class="container">
     <h1>✈️ 機場巴士實時顯示屏</h1>
     <div class="update-time" id="update-time">最後更新: 載入中...</div>
-    <div id="content"><div class="loading">正在解密龍運巴士數據庫...</div></div>
+    <div id="content"><div class="loading">正在使用終極密鑰連線...</div></div>
 </div>
 
 <script>
-    // 【終極大結局】採用官方真正的龍運巴士 (LWB) 純數字編號
+    // 【真・大結局】注入你親自探測出嚟嘅 16 位真・加密 Stop ID
     const config = [
-        { route: "A41P", stopName: "烏溪沙站總站", stopId: "3475", title: "往 機場 (地面運輸中心)", dir: "O" },
-        { route: "A41P", stopName: "機場 (地面運輸中心)", stopId: "3416", title: "往 烏溪沙站", dir: "I" },
-        { route: "E42", stopName: "機場 (地面運輸中心)", stopId: "3416", title: "往 沙田 (博康)", dir: "I" }
+        { route: "A41P", stopName: "烏溪沙站 (MA982)", stopId: "BA72214DFE48AA86", title: "往 機場 (地面運輸中心)", dir: "O" },
+        { route: "A41P", stopName: "機場 (地面運輸中心)", stopId: "A987AE35EE1ED343", title: "往 烏溪沙站", dir: "I" },
+        { route: "E42", stopName: "機場 (地面運輸中心)", stopId: "A987AE35EE1ED343", title: "往 沙田 (博康)", dir: "I" }
     ];
 
     async function fetchAllETA() {
@@ -131,7 +129,6 @@
 
         for (const bus of config) {
             try {
-                // 注意：API 網址依然維持 data.etabus.gov.hk，但帶入純數字 Stop ID
                 const url = `https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${bus.stopId}`;
                 const response = await fetch(url);
                 const json = await response.json();
@@ -191,7 +188,7 @@
     }
 
     fetchAllETA();
-    setInterval(fetchAllETA, 30000);
+    setInterval(fetchAllETA, 30000); // 每 30 秒自動刷新
 </script>
 
 </body>
