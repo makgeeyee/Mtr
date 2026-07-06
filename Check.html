@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <title>青馬轉車站實時數據倒模器</title>
+    <style>
+        body { font-family: -apple-system, monospace; background: #0f172a; color: #f1f5f9; padding: 20px; }
+        .box { border: 2px solid #334155; padding: 15px; margin-bottom: 20px; border-radius: 8px; background: #1e293b; }
+        h2 { color: #f97316; margin-top: 0; font-size: 18px; }
+        .found { color: #4ade80; font-weight: bold; background: #14532d; padding: 4px 8px; border-radius: 4px; display: inline-block; }
+        .error { color: #f87171; }
+        .info { color: #38bdf8; }
+        ul { padding-left: 20px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 青馬轉車站「實時到站」密碼倒模器</h1>
+    <p>既然拿路線圖會 404，我哋直接用 A41P 去機場方向做誘餌，直接去查「果個站」依家有咩車經過！</p>
+    <div id="log">正在追蹤 A41P 往機場方向的軌跡...</div>
+
+<script>
+    async function probe() {
+        const logDiv = document.getElementById('log');
+        logDiv.innerHTML = '<p class="info">⏳ 第一步：正在從 A41P 去程路線搵「青嶼幹線轉車站」嘅真身...</p>';
+        
+        try {
+            // 1. 先用絕對行得通嘅 A41P 去程，撈出中途站
+            let res = await fetch("https://data.etabus.gov.hk/v1/transport/kmb/route-stop/A41P/outbound");
+            let json = await res.json();
+            
+            let targetStopId = null;
+            
+            for (let item of json.data) {
+                let stopRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop/${item.stop}`);
+                let stopJson = await stopRes.json();
+                if (stopJson.data && stopJson.data.name_tc.includes("青嶼幹線")) {
+                    targetStopId = item.stop;
+                    break;
+                }
+            }
+            
+            if (!targetStopId) {
+                logDiv.innerHTML += '<p class="error">❌ 居然連 A41P 沿途都找不到叫「青嶼幹線」嘅站？系統有變！</p>';
+                return;
+            }
+            
+            logDiv.innerHTML += `<p class="found">🎯 成功捕捉實體車站 ID: <code>${targetStopId}</code></p>`;
+            logDiv.innerHTML += '<p class="info">⏳ 第二步：正在轟炸呢個車站，倒模緊依家有咩巴士線正衝過來...</p>';
+            
+            // 2. 直接去查呢個站嘅實時 ETA
+            let etaRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop-eta/${targetStopId}`);
+            let etaJson = await etaRes.json();
+            
+            if (!etaJson.data || etaJson.data.length === 0) {
+                logDiv.innerHTML += '<p class="error">⚠️ 呢個車站目前沒有任何實時到站數據吐出。</p>';
+                return;
+            }
+            
+            // 3. 把所有正在停靠/即將抵達呢個站嘅路線、方向、定義列出來
+            let html = '<h3>📋 倒模結果：呢個站目前收到以下路線嘅實時訊號：</h3><ul>';
+            
+            // 用 Set 來去重，方便肉眼看
+            let seen = new Set();
+            
+            etaJson.data.forEach(item => {
+                let key = `${item.route}-${item.dir}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    html += `<li><strong>路線: <span style="color:#facc15; font-size:18px;">${item.route}</span></strong> | 官方方向代號 (dir): <span style="color:#38bdf8;">"${item.dir}"</span> </li>`;
+                }
+            });
+            
+            html += '</ul><p class="info">💡 請幫我睇睇呢個列表入面，你有需要嘅 E42、E36S、E32、E41 有冇喺度？佢哋對應嘅 dir 係 "O" 定 "I"？</p>';
+            logDiv.innerHTML += html;
+            
+        } catch (e) {
+            logDiv.innerHTML += `<p class="error">❌ 出錯: ${e.message}</p>`;
+        }
+    }
+
+    probe();
+</script>
+</body>
+</html>
