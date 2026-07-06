@@ -86,4 +86,122 @@
         }
         .eta-countdown { 
             font-weight: bold; 
-            color: #38bdf8;
+            color: #38bdf8; 
+            font-family: monospace;
+            font-size: 16px;
+        }
+        .next-train { 
+            color: #facc15; 
+        }
+        .loading { 
+            text-align: center; 
+            color: #94a3b8; 
+            padding: 30px; 
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🚇 石硤尾站實時顯示屏</h1>
+    <div class="update-time" id="update-time">最後更新: 正在初始化...</div>
+    <div id="content">
+        <div class="loading">正在連接港鐵數據庫...</div>
+    </div>
+</div>
+
+<script>
+    // 港鐵設定：石硤尾站 (SKM) 觀塘綫 (KTL)
+    const STATION = "SKM";
+    const LINE = "KTL";
+
+    async function fetchMtrETA() {
+        const contentDiv = document.getElementById('content');
+        const now = new Date();
+        
+        document.getElementById('update-time').innerText = `最後更新: ${now.toLocaleTimeString()}`;
+
+        try {
+            // 直接呼叫港鐵官方 API
+            const url = `https://rt.data.gov.hk/v1/transport/mtr/getETA.php?line=${LINE}&station=${STATION}`;
+            const response = await fetch(url);
+            const json = await response.json();
+            
+            // 檢查數據結構是否正常
+            if (!json.data || !json.data[`${LINE}-${STATION}`]) {
+                contentDiv.innerHTML = `<div class="loading">暫時未能獲取班次數據</div>`;
+                return;
+            }
+
+            const stationData = json.data[`${LINE}-${STATION}`];
+            let htmlContent = '';
+
+            // 定義兩個方向
+            const directions = [
+                { key: "UP", title: "往 調景嶺 方向" },
+                { key: "DOWN", title: "往 黃埔 方向" }
+            ];
+
+            directions.forEach(dir => {
+                const trainList = stationData[dir.key] || [];
+                
+                htmlContent += `
+                    <div class="platform-box">
+                        <div class="platform-header">
+                            <span class="line-badge">觀塘綫</span>
+                            <span class="platform-dest">${dir.title}</span>
+                        </div>
+                        <ul class="eta-list">
+                `;
+
+                if (trainList.length === 0) {
+                    htmlContent += `<li class="eta-item" style="color:#64748b;justify-content:center;padding:10px 0;">暫無實時班次資料</li>`;
+                } else {
+                    trainList.forEach((train, index) => {
+                        // 港鐵 API 直接提供了倒數分鐘數 "ttnt"
+                        const ttnt = parseInt(train.ttnt);
+                        let countdownStr = '';
+                        
+                        if (ttnt === 0) {
+                            countdownStr = "即將到站";
+                        } else if (ttnt === 1) {
+                            countdownStr = "1 MIN";
+                        } else {
+                            countdownStr = `${ttnt} MINS`;
+                        }
+
+                        // 月台編號
+                        const plat = train.plat;
+
+                        htmlContent += `
+                            <li class="eta-item">
+                                <span class="eta-plat">Platform ${plat}</span>
+                                <span class="eta-countdown ${index === 0 && ttnt <= 1 ? 'next-train' : ''}">${countdownStr}</span>
+                            </li>
+                        `;
+                    });
+                }
+
+                htmlContent += `</ul></div>`;
+            });
+
+            contentDiv.innerHTML = htmlContent;
+
+        } catch (error) {
+            console.error(error);
+            contentDiv.innerHTML = `
+                <div class="platform-box" style="border-top: 4px solid #ef4444;">
+                    <div style="color:#ef4444; font-size:14px; text-align:center; padding:15px 0;">港鐵訊號連線中斷</div>
+                </div>`;
+        }
+    }
+
+    // 啟動 App
+    fetchMtrETA();
+    // 每 30 秒自動重整
+    setInterval(fetchMtrETA, 30000);
+</script>
+
+</body>
+</html>
